@@ -1,116 +1,68 @@
-// Copyright (c) FIRST and other WPILib contributors.
-// Open Source Software; you can modify and/or share it under the terms of
-// the WPILib BSD license file in the root directory of this project.
-
 package frc.robot;
 
-import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj.XboxController;
-import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import com.ctre.phoenix.motorcontrol.can.WPI_VictorSPX;
 
-/**
- * The VM is configured to automatically run this class, and to call the functions corresponding to
- * each mode, as described in the TimedRobot documentation. If you change the name of this class or
- * the package after creating this project, you must also update the build.gradle file in the
- * project.
- */
-public class Robot extends TimedRobot {
-  private static final String kDefaultAuto = "Default";
-  private static final String kCustomAuto = "My Auto";
-  private String m_autoSelected;
-  private final SendableChooser<String> m_chooser = new SendableChooser<>();
-  private final WPI_VictorSPX m_leftMotor = new WPI_VictorSPX(0);
-  private final WPI_VictorSPX m_rightMotor = new WPI_VictorSPX(1);
-  private final DifferentialDrive m_roboDrive = new DifferentialDrive(m_leftMotor, m_rightMotor);
-  private final XboxController m_driverController = new XboxController(0);
+import edu.wpi.first.cameraserver.CameraServer;
+import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
+import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardComponent;
+import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardContainer;
+import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardLayout;
+import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
-  /**
-   * This function is run when the robot is first started up and should be used for any
-   * initialization code.
-   */
+public class Robot extends TimedRobot {
+  private final WPI_VictorSPX m_rightMotor = new WPI_VictorSPX(0); // Note - Creates a new motor, because the motor exists physically not digitally yet.
+  private final WPI_VictorSPX m_leftMotor = new WPI_VictorSPX(1); // Note - Creates another new motor
+  private final DifferentialDrive m_robotDrive = new DifferentialDrive(m_leftMotor, m_rightMotor); // Note - Creates an instance of differential drive that takes in inputs of the left and right motors. */
+  private final XboxController m_driverController = new XboxController(0); // Note - Creates an Xbox Controller object/instance
+  ShuffleboardTab joystickValues = Shuffleboard.getTab("Joystick Values");
+
   @Override
   public void robotInit() {
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
-    SmartDashboard.putData("Auto choices", m_chooser);
-    m_rightMotor.setInverted(true);
+    m_rightMotor.setInverted(true); // Note - Inverts the motors on one side because of the orientation physically. If not inverted, then it would turn.
+    CameraServer.startAutomaticCapture();        
   }
 
-  /**
-   * This function is called every 20 ms, no matter the mode. Use this for items like diagnostics
-   * that you want ran during disabled, autonomous, teleoperated and test.
-   *
-   * <p>This runs after the mode specific periodic functions, but before LiveWindow and
-   * SmartDashboard integrated updating.
-   */
   @Override
   public void robotPeriodic() {
-    m_roboDrive.arcadeDrive(m_driverController.getLeftY(), m_driverController.getRightX());
+    /* Note - Arcade Drive function that takes in the controllers left Y axis values and right X values to move the robot. The controllers sticks will return a value between 1 
+    and -1, which when inputted into the function, will give the motors speed/movement. Motor movement is simple. It's 0% power at default, meaning it has 0% speed, but if you
+    give the motor 20% power, it has 20% speed. Similarlly if you take the 1 and -1 values the sticks give off and assign them to the motors, you have motor speed. Although 1 wouuld
+    act as 100%. This function, which is built into the library, has shortened this down for us so we only have to call one function. Because we gave the variable m_robotDrive the motor inputs, we just call the function without having to reference the motors. */
+    m_robotDrive.arcadeDrive(-m_driverController.getLeftY(), -m_driverController.getRightX()); // Note - Takes in the controller's left Y axis & right x axis values to move the robot. LeftY moves back & forth, RightX turns.
+    SmartDashboard.putNumber("Joystick X value" , m_driverController.getLeftY());
   }
 
-  /**
-   * This autonomous (along with the chooser code above) shows how to select between different
-   * autonomous modes using the dashboard. The sendable chooser code works with the Java
-   * SmartDashboard. If you prefer the LabVIEW Dashboard, remove all of the chooser code and
-   * uncomment the getString line to get the auto name from the text box below the Gyro
-   *
-   * <p>You can add additional auto modes by adding additional comparisons to the switch structure
-   * below with additional strings. If using the SendableChooser make sure to add them to the
-   * chooser code above as well.
-   */
   @Override
-  public void autonomousInit() {
-    m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
-    System.out.println("Auto selected: " + m_autoSelected);
-  }
+  public void autonomousInit() {}
 
-  /** This function is called periodically during autonomous. */
   @Override
-  public void autonomousPeriodic() {
-    switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
-    }
-  }
+  public void autonomousPeriodic() {}
 
-  /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {}
 
-  /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {}
 
-  /** This function is called once when the robot is disabled. */
   @Override
   public void disabledInit() {}
 
-  /** This function is called periodically when disabled. */
   @Override
   public void disabledPeriodic() {}
 
-  /** This function is called once when test mode is enabled. */
   @Override
   public void testInit() {}
 
-  /** This function is called periodically during test mode. */
   @Override
   public void testPeriodic() {}
 
-  /** This function is called once when the robot is first started up. */
   @Override
   public void simulationInit() {}
 
-  /** This function is called periodically whilst in simulation. */
   @Override
   public void simulationPeriodic() {}
 }
