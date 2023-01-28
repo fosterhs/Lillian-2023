@@ -51,6 +51,7 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousInit() {
     timer.reset();
+    updateVariables();
   }
 
   @Override
@@ -61,6 +62,7 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopInit() {
     timer.reset();
+    updateVariables();
   }
 
   @Override
