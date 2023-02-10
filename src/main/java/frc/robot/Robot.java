@@ -74,7 +74,7 @@ public class Robot extends TimedRobot {
     updateVariables();
     double positionAverage = (positionLeft + positionRight) / 2;
     double error = distanceInMeters - (positionAverage / 45315);
-    drive.arcadeDrive(error,0);
+    drive.arcadeDrive(error / meters,0);
   }
 
   @Override
