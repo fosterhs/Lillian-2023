@@ -48,7 +48,7 @@ public class Robot extends TimedRobot {
   double angle; // gyro angle
   double distance = 45315.0;
   double meters = 5;
-  double distanceInMeters = distance * meters;
+  double distanceInMeters = (distance * meters) / 45315;
 
   @Override
   public void robotInit() {
@@ -72,9 +72,8 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     updateVariables();
-
     double positionAverage = (positionLeft + positionRight) / 2;
-    double error = (distanceInMeters - positionAverage)/45315;
+    double error = distanceInMeters - (positionAverage / 45315);
     drive.arcadeDrive(error,0);
   }
 
