@@ -3,6 +3,7 @@ package frc.robot;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.net.PortForwarder;
 import edu.wpi.first.wpilibj.ADIS16448_IMU;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
@@ -49,6 +50,7 @@ public class Robot extends TimedRobot {
 
   @Override
   public void robotInit() {
+    PortForwarder.add(8888, "wpilibpi.local", 80);
     initializeMotors(); // starts and configures the motors
     timer.start(); // starts the timer at 0s.
     gyro.calibrate(); // sets the gyro angle to 0 based on the current robot position 
@@ -69,6 +71,7 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     updateVariables();
+    drive.feed();
   }
 
   @Override

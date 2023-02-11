@@ -8,6 +8,8 @@ from enum import Enum
 from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer, CvSource, CvSink, MjpegServer, VideoMode
 from ntcore import NetworkTableInstance, EventFlags
 
+time.sleep(60) #Waits 1 minute for the RoboRio to boot.
+
 ntinst = NetworkTableInstance.getDefault() #Creates a NetworkTableInstance object.
 
 # Creating a Network Tables server. Server Name: "wpilibpi"
