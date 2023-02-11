@@ -5,13 +5,13 @@ import cv2
 import numpy
 import math
 from enum import Enum
-from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer
+from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer, CvSource, CvSink, MjpegServer, VideoMode
 from ntcore import NetworkTableInstance, EventFlags
 
 ntinst = NetworkTableInstance.getDefault() #Creates a NetworkTableInstance object.
 
 # Creating a Network Tables server. Server Name: "wpilibpi"
-# ntinst.startServer()
+#ntinst.startServer()
 
 # Connecting to Network Tables as a client.
 ntinst.startClient4("wpilibpi")
@@ -28,14 +28,16 @@ sizePub = table.getDoubleArrayTopic("Size").publish() # Creates a topic called "
 
 # Initializes the camera and begins streaming video to Network Tables.
 camera = CameraServer.startAutomaticCapture() # USB Camera object.
-camera.setResolution(320,240) #lower resolutions are faster to process
+camera.setResolution(160,120) #lower resolutions are faster to process and less bandwidth
 camera.setFPS(30) #30 is the max
-camera.setExposureManual(25) #Range 0-100. Sets how much light makes it to the sensor.
+camera.setExposureManual(30) #Range 0-100. Sets how much light makes it to the sensor.
+camera.setWhiteBalanceManual(3300) # Sets the warmth of the image. Lower values are colder/bluer and higher values are warmer/oranger
+camera.setBrightness(0) #WPILIB bug. Camera will always reset to a brightness of 0. Keep this value at 0 for consistency.
 
 
 sink = CameraServer.getVideo() # CvSink object. Frames from the camera are sent here to be processed.
-source = CameraServer.putVideo("Vision Output", 320, 240) # CvSource object. Output frames from CV are sent here to be uploaded to Network Tables.
-img_in = numpy.zeros(shape=(320,240,3),dtype=numpy.uint8) # creates a 3D array size 320 x 240 x 3. Each element is an unsigned 8 bit integer (0-255). Value initialized to 0.
+source = CameraServer.putVideo("Vision Output", 160, 120) # CvSource object. Output frames from CV are sent here to be uploaded to Network Tables.
+img_in = numpy.zeros(shape=(160,120,3),dtype=numpy.uint8) # creates a 3D array size 320 x 240 x 3. Each element is an unsigned 8 bit integer (0-255). Value initialized to 0.
 img_out = numpy.copy(img_in) # Creates another array for the output image.
 
 # Initializes frame and start time variables to be published to Network Tables.
@@ -53,19 +55,19 @@ class GripPipeline:
         """
 
         self.__blur_type = BlurType.Gaussian_Blur
-        self.__blur_radius = 5.405405405405405
+        self.__blur_radius = 3
 
         self.blur_output = None
 
         self.__hsv_threshold_input = self.blur_output
-        self.__hsv_threshold_hue = [155.3956834532374, 170.78498293515355]
-        self.__hsv_threshold_saturation = [73.38129496402877, 183.1996587030717]
-        self.__hsv_threshold_value = [178.86690647482015, 255.0]
+        self.__hsv_threshold_hue = [60, 100]
+        self.__hsv_threshold_saturation = [100, 255]
+        self.__hsv_threshold_value = [70, 255]
 
         self.hsv_threshold_output = None
 
         self.__find_blobs_input = self.hsv_threshold_output
-        self.__find_blobs_min_area = 100.0
+        self.__find_blobs_min_area = 20.0
         self.__find_blobs_circularity = [0.0, 1.0]
         self.__find_blobs_dark_blobs = False
 
