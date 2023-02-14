@@ -37,7 +37,7 @@ public class Robot extends TimedRobot {
   // motor encoder values
   double positionLeft;
   double positionRight;
-  double positionAverage = (positionLeft + positionRight) / 2;
+  double positionAverage = (positionLeft + positionRight)/2;
   double positionBelt;
   double positionInternalIntake;
   double positionExternalIntake;
@@ -48,7 +48,7 @@ public class Robot extends TimedRobot {
   double robotY;
   double angle; // gyro angle
   double distance = 3;
-  double error = distance - positionAverage;
+  double error = distance-positionAverage;
   
   @Override
   public void robotInit() {
