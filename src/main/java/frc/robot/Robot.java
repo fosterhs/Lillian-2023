@@ -37,7 +37,7 @@ public class Robot extends TimedRobot {
   // motor encoder values
   double positionLeft;
   double positionRight;
-  double positionAverage = (positionLeft + positionRight)/2;
+  double positionAverage = (positionLeft+positionRight)/2;
   double positionBelt;
   double positionInternalIntake;
   double positionExternalIntake;
