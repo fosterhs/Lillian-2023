@@ -37,6 +37,7 @@ public class Robot extends TimedRobot {
   // motor encoder values
   double positionLeft;
   double positionRight;
+  double positionAverage = (positionLeft + positionRight) / 2;
   double positionBelt;
   double positionInternalIntake;
   double positionExternalIntake;
@@ -47,6 +48,7 @@ public class Robot extends TimedRobot {
   double robotY;
   double angle; // gyro angle
   double distance = 3;
+  double error = distance - positionAverage;
   
   @Override
   public void robotInit() {
@@ -70,8 +72,6 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     updateVariables();
-    double positionAverage = (positionLeft + positionRight) / 2;
-    double error = distance - positionAverage;
     drive.arcadeDrive(error / distance, 0);
   }
 
