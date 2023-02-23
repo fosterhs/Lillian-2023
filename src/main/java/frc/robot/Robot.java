@@ -1,5 +1,6 @@
 package frc.robot;
 
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
@@ -49,7 +50,9 @@ public class Robot extends TimedRobot {
   double angle; // gyro angle
   double distance = 3;
   double error = distance-positionAverage;
-  
+  double xSpeed;//declaration
+  PIDController pid = new PIDController(1, 0, 0);
+
   @Override
   public void robotInit() {
     initializeMotors(); // starts and configures the motors
@@ -72,7 +75,7 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     updateVariables();
-    drive.arcadeDrive(error/distance, 0);
+    drive.arcadeDrive(pid.calculate(positionAverage, distance), 0);
   }
 
   @Override
@@ -194,11 +197,11 @@ public class Robot extends TimedRobot {
     positionExternalIntake = intakeExternal.getSelectedSensorPosition(0);
     time = timer.get();
     angle = -gyro.getGyroAngleZ();
-
     odometry.update(new Rotation2d(angle*Math.PI/180), positionLeft, positionRight);
     robotPosition = odometry.getPoseMeters();
     robotX = robotPosition.getX();
     robotY = robotPosition.getY();
+    xSpeed += 1;// update
     
     // publishes updated variables to the dashboard
     SmartDashboard.putNumber("leftStickY", leftStickY);
@@ -216,5 +219,6 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Angle", angle);
     SmartDashboard.putNumber("RobotX",  robotX);
     SmartDashboard.putNumber("RobotY", robotY);
+    SmartDashboard.putNumber("xSpeed", xSpeed);//publish
   }
 }
