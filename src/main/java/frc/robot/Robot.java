@@ -16,6 +16,7 @@ import com.ctre.phoenix.motorcontrol.TalonFXFeedbackDevice;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
 
 public class Robot extends TimedRobot {
+  PIDController pid = new PIDController(1, 0.25, 0.5);
   WPI_TalonFX left = new WPI_TalonFX(2); // left drive motor
   WPI_TalonFX right = new WPI_TalonFX(0); // right drive motor
   WPI_TalonFX belt = new WPI_TalonFX(1); // belt motor
@@ -51,7 +52,6 @@ public class Robot extends TimedRobot {
   double distance = 3;
   double error = distance-positionAverage;
   double xSpeed;//declaration
-  PIDController pid = new PIDController(1, 0, 0);
 
   @Override
   public void robotInit() {
@@ -75,7 +75,7 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     updateVariables();
-    drive.arcadeDrive(pid.calculate(positionAverage, distance), 0);
+    drive.arcadeDrive(pid.calculate((positionLeft+positionRight), distance), 0);
   }
 
   @Override
