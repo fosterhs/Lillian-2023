@@ -75,7 +75,7 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     updateVariables();
-    drive.arcadeDrive(pid.calculate((positionLeft+positionRight), distance), 0);
+    drive.arcadeDrive(pid.calculate((positionLeft+positionRight)/2, distance), 0);
   }
 
   @Override
