@@ -49,7 +49,7 @@ public class Robot extends TimedRobot {
   double robotX;
   double robotY;
   double angle; // gyro angle
-  double distance = 3;
+  double distance = 1;
   double error = distance-positionAverage;
   double xSpeed;//declaration
 
