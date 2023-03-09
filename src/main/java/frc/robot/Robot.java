@@ -147,8 +147,8 @@ public class Robot extends TimedRobot {
 
     // sets motor speeds based on controller inputs with slew rate and max speed protections.
     // left stick Y controls speed, right stick X controls rotation.
-    double translation = slewSpeedController.calculate(-driveController.getLeftY());
-    double rotation = slewRotationController.calculate(-driveController.getRightX());
+    double translation = slewSpeedController.calculate(-d_leftStickY);
+    double rotation = slewRotationController.calculate(-d_rightStickX);
    
     if (rotation > maxRotationSpeed) {
       rotation = maxRotationSpeed;
@@ -160,10 +160,8 @@ public class Robot extends TimedRobot {
     drive.arcadeDrive(translation, rotation);
 
     // arm actuation. Left and right triggers control the bottom arm. Left stick Y controls the top arm
-    double leftTrigger = armController.getLeftTriggerAxis();
-    double rightTrigger = armController.getRightTriggerAxis();
-    bottomArm.set(rightTrigger-leftTrigger);
-    topArm.set(ControlMode.PercentOutput, -armController.getLeftY());
+    bottomArm.set(a_rightTrigger-a_leftTrigger);
+    topArm.set(ControlMode.PercentOutput, -a_leftStickY);
   }
 
   @Override
