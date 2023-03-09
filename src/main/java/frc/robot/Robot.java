@@ -32,7 +32,7 @@ public class Robot extends TimedRobot {
   DifferentialDrive drive = new DifferentialDrive(motorGroupLeft, motorGroupRight);
   XboxController driveController = new XboxController(0);
   XboxController armController = new XboxController(1);
-  RelativeEncoder bottomArmEncoder = bottomArm.getEncoder(SparkMaxRelativeEncoder.Type.kQuadrature, 4096); //bottom arm encoder
+  RelativeEncoder bottomArmEncoder = bottomArm.getEncoder(SparkMaxRelativeEncoder.Type.kQuadrature, 2048); //bottom arm encoder
   AHRS gyro = new AHRS(); // NavX2 gyro
   Timer timer = new Timer(); 
   double encoderTicksPerMeter = 2048*10.71/(0.0254*6*Math.PI); // theoretical 45812 ticks per meter traveled
@@ -274,5 +274,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("a_rightStickX", a_rightStickX);
     SmartDashboard.putNumber("a_leftTrigger", a_leftTrigger);
     SmartDashboard.putNumber("a_rightTrigger", a_rightTrigger);
+    SmartDashboard.putBoolean("Compressor", compressorToggle);
+    SmartDashboard.putBoolean("Solenoid", solenoidToggle);
   }
 }
