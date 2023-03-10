@@ -46,9 +46,9 @@ public class Robot extends TimedRobot {
   boolean solenoidToggle = false;
   
   // Drive Variables
-  SlewRateLimiter slewSpeedController = new SlewRateLimiter(0.65);
+  SlewRateLimiter slewSpeedController = new SlewRateLimiter(0.60);
   SlewRateLimiter slewRotationController = new SlewRateLimiter(60.0);
-  double maxRotationSpeed = 0.55;
+  double maxRotationSpeed = 0.40;
 
   // Controller Variables
   double d_leftStickY;
@@ -158,11 +158,15 @@ public class Robot extends TimedRobot {
       rotation = -maxRotationSpeed;
       }
 
-    drive.arcadeDrive(translation, rotation);
+    drive.arcadeDrive(translation, rotation, true);
 
     // arm actuation. Left and right triggers control the bottom arm. Left stick Y controls the top arm
     bottomArm.set(a_rightTrigger-a_leftTrigger);
-    topArm.set(ControlMode.PercentOutput, -a_leftStickY);
+    if (a_leftStickY > 0) {
+      topArm.set(ControlMode.PercentOutput, a_leftStickY*a_leftStickY*0.25);
+    } else {
+      topArm.set(ControlMode.PercentOutput, -a_leftStickY*a_leftStickY*0.25);
+    }
   }
 
   @Override
