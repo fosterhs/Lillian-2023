@@ -162,11 +162,7 @@ public class Robot extends TimedRobot {
 
     // arm actuation. Left and right triggers control the bottom arm. Left stick Y controls the top arm
     bottomArm.set(a_rightTrigger-a_leftTrigger);
-    if (a_leftStickY > 0) {
-      topArm.set(ControlMode.PercentOutput, a_leftStickY*a_leftStickY*0.25);
-    } else {
-      topArm.set(ControlMode.PercentOutput, -a_leftStickY*a_leftStickY*0.25);
-    }
+    topArm.set(ControlMode.PercentOutput, a_leftStickY);
   }
 
   @Override
@@ -224,7 +220,7 @@ public class Robot extends TimedRobot {
     rightFront.setInverted(true);
 
     topArm.configPeakOutputForward(0.25);
-    topArm.configPeakOutputReverse(0.25);
+    topArm.configPeakOutputReverse(-0.25);
     topArm.configClosedLoopPeakOutput(0, 0.25);
     
     bottomArm.restoreFactoryDefaults(); // resets bottomArm to default
