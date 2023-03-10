@@ -17,6 +17,7 @@ import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.NeutralMode;
+import com.ctre.phoenix.motorcontrol.can.TalonFXConfiguration;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
 import com.kauailabs.navx.frc.AHRS;
 
@@ -195,33 +196,36 @@ public class Robot extends TimedRobot {
   @Override
   public void simulationPeriodic() {}
 
+  public void initializeCTREMotor(WPI_TalonFX motor) {
+    motor.configFactoryDefault();
+    TalonFXConfiguration config = new TalonFXConfiguration();
+    config.supplyCurrLimit.enable = true;
+    config.supplyCurrLimit.triggerThresholdCurrent = 40; // max current in amps
+    config.supplyCurrLimit.triggerThresholdTime = 0.5; // max time exceeding max current in seconds
+    config.supplyCurrLimit.currentLimit = 40; // max current after exceeding threshold 
+    motor.configAllSettings(config);
+    motor.setSelectedSensorPosition(0); // sets encoder to 0
+    motor.setNeutralMode(NeutralMode.Coast);
+  }
+
   public void initializeMotors() {
-    // resets motors to default
-    bottomArm.restoreFactoryDefaults();
-    topArm.configFactoryDefault();
-    leftBack.configFactoryDefault();
-    leftFront.configFactoryDefault();
-    rightBack.configFactoryDefault();
-    rightFront.configFactoryDefault();
-    
-    // sets all encoders to 0
-    topArm.setSelectedSensorPosition(0);
-    leftBack.setSelectedSensorPosition(0);
-    leftFront.setSelectedSensorPosition(0);
-    rightBack.setSelectedSensorPosition(0);
-    rightFront.setSelectedSensorPosition(0);
+    initializeCTREMotor(topArm);
+    initializeCTREMotor(leftBack);
+    initializeCTREMotor(leftFront);
+    initializeCTREMotor(rightBack);
+    initializeCTREMotor(rightFront);
     
     // inverts right drive motors
     rightBack.setInverted(true);
     rightFront.setInverted(true);
 
-    // sets all motors to coast
-    topArm.setNeutralMode(NeutralMode.Coast);
-    leftBack.setNeutralMode(NeutralMode.Coast);
-    leftFront.setNeutralMode(NeutralMode.Coast);
-    rightBack.setNeutralMode(NeutralMode.Coast);
-    rightFront.setNeutralMode(NeutralMode.Coast);
-    bottomArm.setIdleMode(IdleMode.kCoast);
+    topArm.configPeakOutputForward(0.25);
+    topArm.configPeakOutputReverse(0.25);
+    topArm.configClosedLoopPeakOutput(0, 0.25);
+    
+    bottomArm.restoreFactoryDefaults(); // resets bottomArm to default
+    bottomArm.setIdleMode(IdleMode.kCoast); // sets bottomArm to coast
+    bottomArm.setSmartCurrentLimit(20); // sets current limit for bottomArm in amps
   }
   
   // updates all program variables. should be called at the begining of every loop.
