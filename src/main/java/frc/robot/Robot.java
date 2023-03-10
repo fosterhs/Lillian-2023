@@ -38,6 +38,7 @@ public class Robot extends TimedRobot {
   Timer timer = new Timer(); 
   double encoderTicksPerMeter = 2048*10.71/(0.0254*6*Math.PI); // theoretical 45812 ticks per meter traveled
   double encoderTicksPerRev = 2048*12*64/18; // theoretical 87381 ticks per revolution of top arm
+  boolean coast = true;
 
   // Pneumatics Variables
   Compressor compressor = new Compressor(0, PneumaticsModuleType.CTREPCM);
@@ -92,14 +93,7 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousInit() {
     timer.reset();
-
-    // sets motors to brake when 0 commands are given
-    topArm.setNeutralMode(NeutralMode.Brake);
-    leftBack.setNeutralMode(NeutralMode.Brake);
-    leftFront.setNeutralMode(NeutralMode.Brake);
-    rightBack.setNeutralMode(NeutralMode.Brake);
-    rightFront.setNeutralMode(NeutralMode.Brake);
-    bottomArm.setIdleMode(IdleMode.kBrake);
+    brakeMotors(); // sets motors to brake when 0 commands are given
   }
 
   @Override
@@ -110,14 +104,7 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopInit() {
     timer.reset();
-
-    // sets motors to brake when 0 commands are given
-    topArm.setNeutralMode(NeutralMode.Brake);
-    leftBack.setNeutralMode(NeutralMode.Brake);
-    leftFront.setNeutralMode(NeutralMode.Brake);
-    rightBack.setNeutralMode(NeutralMode.Brake);
-    rightFront.setNeutralMode(NeutralMode.Brake);
-    bottomArm.setIdleMode(IdleMode.kBrake);
+    brakeMotors(); // sets motors to brake when 0 commands are given
   }
 
   @Override
@@ -168,20 +155,14 @@ public class Robot extends TimedRobot {
   @Override
   public void disabledInit() {
     timer.reset();
-    Timer.delay(2); // 2 second delay to allow motors to brake upon being disabled.
-
-    // Sets motors to coast
-    topArm.setNeutralMode(NeutralMode.Coast);
-    leftBack.setNeutralMode(NeutralMode.Coast);
-    leftFront.setNeutralMode(NeutralMode.Coast);
-    rightBack.setNeutralMode(NeutralMode.Coast);
-    rightFront.setNeutralMode(NeutralMode.Coast);
-    bottomArm.setIdleMode(IdleMode.kBrake);
   }
 
   @Override
   public void disabledPeriodic() {
     updateVariables();
+    if (!coast & time > 2) { // Sets the motors to coast after 2 seconds
+      coastMotors();
+    }
   }
 
   @Override
@@ -196,16 +177,35 @@ public class Robot extends TimedRobot {
   @Override
   public void simulationPeriodic() {}
 
+  public void coastMotors() {
+    topArm.setNeutralMode(NeutralMode.Coast);
+    leftBack.setNeutralMode(NeutralMode.Coast);
+    leftFront.setNeutralMode(NeutralMode.Coast);
+    rightBack.setNeutralMode(NeutralMode.Coast);
+    rightFront.setNeutralMode(NeutralMode.Coast);
+    bottomArm.setIdleMode(IdleMode.kBrake);
+    coast = true;
+  }
+
+  public void brakeMotors() {
+    topArm.setNeutralMode(NeutralMode.Brake);
+    leftBack.setNeutralMode(NeutralMode.Brake);
+    leftFront.setNeutralMode(NeutralMode.Brake);
+    rightBack.setNeutralMode(NeutralMode.Brake);
+    rightFront.setNeutralMode(NeutralMode.Brake);
+    bottomArm.setIdleMode(IdleMode.kBrake);
+    coast = false;
+  }
+
   public void initializeCTREMotor(WPI_TalonFX motor) {
     motor.configFactoryDefault();
     TalonFXConfiguration config = new TalonFXConfiguration();
     config.supplyCurrLimit.enable = true;
     config.supplyCurrLimit.triggerThresholdCurrent = 40; // max current in amps
-    config.supplyCurrLimit.triggerThresholdTime = 0.5; // max time exceeding max current in seconds
+    config.supplyCurrLimit.triggerThresholdTime = 0; // max time exceeding max current in seconds
     config.supplyCurrLimit.currentLimit = 40; // max current after exceeding threshold 
     motor.configAllSettings(config);
     motor.setSelectedSensorPosition(0); // sets encoder to 0
-    motor.setNeutralMode(NeutralMode.Coast);
   }
 
   public void initializeMotors() {
@@ -219,13 +219,13 @@ public class Robot extends TimedRobot {
     rightBack.setInverted(true);
     rightFront.setInverted(true);
 
-    topArm.configPeakOutputForward(0.25);
-    topArm.configPeakOutputReverse(-0.25);
-    topArm.configClosedLoopPeakOutput(0, 0.25);
+    topArm.configPeakOutputForward(0.25); // limits topArm to 25% power in forwards direction
+    topArm.configPeakOutputReverse(-0.25); // limits topArm to 25% power in backwards direction
+    topArm.configClosedLoopPeakOutput(0, 0.25); // limits topArm to 25% power during Motion Magic and other closed loop control
     
     bottomArm.restoreFactoryDefaults(); // resets bottomArm to default
-    bottomArm.setIdleMode(IdleMode.kCoast); // sets bottomArm to coast
     bottomArm.setSmartCurrentLimit(20); // sets current limit for bottomArm in amps
+    coastMotors(); // sets all motors to coast
   }
   
   // updates all program variables. should be called at the begining of every loop.
@@ -278,5 +278,6 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("a_rightTrigger", a_rightTrigger);
     SmartDashboard.putBoolean("Compressor", compressorToggle);
     SmartDashboard.putBoolean("Solenoid", solenoidToggle);
+    SmartDashboard.putBoolean("Coast", coast);
   }
 }
