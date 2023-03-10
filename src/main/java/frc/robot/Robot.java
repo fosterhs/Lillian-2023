@@ -160,7 +160,7 @@ public class Robot extends TimedRobot {
   @Override
   public void disabledPeriodic() {
     updateVariables();
-    if (!coast & time > 2) { // Sets the motors to coast after 2 seconds
+    if (!coast && time > 2) { // Sets the motors to coast after 2 seconds
       coastMotors();
     }
   }
