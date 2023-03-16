@@ -149,7 +149,8 @@ public class Robot extends TimedRobot {
 
     // arm actuation. Left and right triggers control the bottom arm. Left stick Y controls the top arm
     bottomArm.set(a_rightTrigger-a_leftTrigger);
-    topArm.set(ControlMode.PercentOutput, a_leftStickY);
+    // topArm.set(ControlMode.PercentOutput, a_leftStickY);
+    topArm.set(ControlMode.MotionMagic, 0);
   }
 
   @Override
@@ -223,6 +224,14 @@ public class Robot extends TimedRobot {
     topArm.configPeakOutputReverse(-0.25); // limits topArm to 25% power in backwards direction
     topArm.configClosedLoopPeakOutput(0, 0.25); // limits topArm to 25% power during Motion Magic and other closed loop control
     
+    // sets motion magic parameters for topArm motor
+    topArm.config_kP(0, 0);
+    topArm.config_kI(0, 0);
+    topArm.config_kD(0, 0);
+    topArm.configMotionAcceleration(0);
+    topArm.configMotionCruiseVelocity(0);
+    topArm.configMaxIntegralAccumulator(0, 0);
+
     bottomArm.restoreFactoryDefaults(); // resets bottomArm to default
     bottomArm.setSmartCurrentLimit(20); // sets current limit for bottomArm in amps
     coastMotors(); // sets all motors to coast
