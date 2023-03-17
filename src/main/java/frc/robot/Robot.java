@@ -77,6 +77,8 @@ public class Robot extends TimedRobot {
   double yaw;
   double pitch;
 
+  double armPos = 0;
+
   @Override
   public void robotInit() {
     initializeMotors();
@@ -135,7 +137,7 @@ public class Robot extends TimedRobot {
 
     // sets motor speeds based on controller inputs with slew rate and max speed protections.
     // left stick Y controls speed, right stick X controls rotation.
-    double translation = slewSpeedController.calculate(-d_leftStickY);
+    double translation = -(d_leftStickY * d_leftStickY * d_leftStickY);
     double rotation = slewRotationController.calculate(-d_rightStickX);
    
     if (rotation > maxRotationSpeed) {
@@ -145,12 +147,15 @@ public class Robot extends TimedRobot {
       rotation = -maxRotationSpeed;
       }
 
-    drive.arcadeDrive(translation, rotation, true);
+    drive.arcadeDrive(translation, rotation);
 
     // arm actuation. Left and right triggers control the bottom arm. Left stick Y controls the top arm
     bottomArm.set(a_rightTrigger-a_leftTrigger);
     // topArm.set(ControlMode.PercentOutput, a_leftStickY);
-    topArm.set(ControlMode.MotionMagic, 0);
+    if (a_rightStickY > 0.1 || a_rightStickY < -0.1) {
+      armPos = armPos - a_rightStickY*1200;
+    }
+    topArm.set(ControlMode.MotionMagic, armPos - a_leftStickY*encoderTicksPerRev*0.05);
   }
 
   @Override
@@ -225,12 +230,14 @@ public class Robot extends TimedRobot {
     topArm.configClosedLoopPeakOutput(0, 0.25); // limits topArm to 25% power during Motion Magic and other closed loop control
     
     // sets motion magic parameters for topArm motor
-    topArm.config_kP(0, 0);
-    topArm.config_kI(0, 0);
-    topArm.config_kD(0, 0);
-    topArm.configMotionAcceleration(0);
-    topArm.configMotionCruiseVelocity(0);
-    topArm.configMaxIntegralAccumulator(0, 0);
+    topArm.config_kP(0, 1);
+    topArm.config_kI(0, 0.005);
+    topArm.config_kD(0, 10);
+    topArm.configMotionAcceleration(16000);
+    topArm.configMotionCruiseVelocity(50000);
+    topArm.configMaxIntegralAccumulator(0, 0.8);
+    topArm.config_IntegralZone(0, 20000);
+    topArm.configAllowableClosedloopError(0, 100);
 
     bottomArm.restoreFactoryDefaults(); // resets bottomArm to default
     bottomArm.setSmartCurrentLimit(20); // sets current limit for bottomArm in amps
