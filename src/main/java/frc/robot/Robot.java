@@ -4,6 +4,7 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.net.PortForwarder;
 import edu.wpi.first.wpilibj.ADIS16448_IMU;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
@@ -16,7 +17,6 @@ import com.ctre.phoenix.motorcontrol.TalonFXFeedbackDevice;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
 
 public class Robot extends TimedRobot {
-  PIDController pid = new PIDController(1, 0.25, 0.5);
   WPI_TalonFX left = new WPI_TalonFX(2); // left drive motor
   WPI_TalonFX right = new WPI_TalonFX(0); // right drive motor
   WPI_TalonFX belt = new WPI_TalonFX(1); // belt motor
@@ -39,7 +39,6 @@ public class Robot extends TimedRobot {
   // motor encoder values
   double positionLeft;
   double positionRight;
-  double positionAverage = (positionLeft+positionRight)/2;
   double positionBelt;
   double positionInternalIntake;
   double positionExternalIntake;
@@ -49,12 +48,13 @@ public class Robot extends TimedRobot {
   double robotX;
   double robotY;
   double angle; // gyro angle
-  double distance = 1;
-  double error = distance-positionAverage;
-  double xSpeed;//declaration
-
+  int autoStage = 2;
+  double setpoint = 4;
+  PIDController pidSpeed = new PIDController(1, 0.03, 1.5);
+  PIDController pidRotate = new PIDController(0.2, 0.01, 0.1);
   @Override
   public void robotInit() {
+    PortForwarder.add(8888, "wpilibpi.local", 80);
     initializeMotors(); // starts and configures the motors
     timer.start(); // starts the timer at 0s.
     gyro.calibrate(); // sets the gyro angle to 0 based on the current robot position 
@@ -75,7 +75,32 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     updateVariables();
-    drive.arcadeDrive(pid.calculate((positionLeft+positionRight)/2, distance), 0);
+    /*
+    if (autoStage == 1) {
+      drive.arcadeDrive(pidSpeed.calculate((positionLeft+positionRight)/2, setpoint), 0);
+      if ((positionLeft+positionRight)/2 >= setpoint) {
+        autoStage ++;
+      }
+    }
+    */
+    if (autoStage == 2) {
+      drive.arcadeDrive(0,(pidRotate.calculate(angle, 90)));
+      if (angle >= 90) {
+        drive.arcadeDrive(0,0);
+        autoStage ++;
+      }
+    }
+    else {
+      drive.feed();
+    }
+    /*
+    if (autoStage == 3) {
+      drive.arcadeDrive(pidSpeed.calculate((positionLeft+positionRight)/2, 1), 0);
+      if ((positionLeft+positionRight)/2 >= 5) {
+        autoStage ++;
+      }
+    }
+    */
   }
 
   @Override
@@ -197,11 +222,11 @@ public class Robot extends TimedRobot {
     positionExternalIntake = intakeExternal.getSelectedSensorPosition(0);
     time = timer.get();
     angle = -gyro.getGyroAngleZ();
+
     odometry.update(new Rotation2d(angle*Math.PI/180), positionLeft, positionRight);
     robotPosition = odometry.getPoseMeters();
     robotX = robotPosition.getX();
     robotY = robotPosition.getY();
-    xSpeed += 1;// update
     
     // publishes updated variables to the dashboard
     SmartDashboard.putNumber("leftStickY", leftStickY);
@@ -219,6 +244,5 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Angle", angle);
     SmartDashboard.putNumber("RobotX",  robotX);
     SmartDashboard.putNumber("RobotY", robotY);
-    SmartDashboard.putNumber("xSpeed", xSpeed);//publish
   }
 }
