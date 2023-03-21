@@ -59,19 +59,19 @@ public class Robot extends TimedRobot {
   boolean topArmAtSetpoint = false;
   
   // Arm Setpoint 1 Variables
-  double bottomArmSetpoint1 = -0.2;
-  double topArmSetpoint1 = -0.2;
+  double bottomArmSetpoint1 = 0;
+  double topArmSetpoint1 = -0.1;
 
   // Arm Setpoint 2 Variables
-  double bottomArmSetpoint2 = -0.1;
-  double topArmSetpoint2 = -0.1;
+  double bottomArmSetpoint2 = 0.05;
+  double topArmSetpoint2 = -0.05;
 
   // Arm Setpoint 3 Variables
-  double bottomArmSetpoint3 = 0;
-  double topArmSetpoint3 = 0;
+  double bottomArmSetpoint3 = 0.1;
+  double topArmSetpoint3 = 0.05;
 
   // Arm Setpoint 4 Variables
-  double bottomArmSetpoint4 = 0.1;
+  double bottomArmSetpoint4 = 0.15;
   double topArmSetpoint4 = 0.1;
   
   // Drive Variables
@@ -134,7 +134,8 @@ public class Robot extends TimedRobot {
   public void teleopInit() {
     timer.reset();
     brakeMotors();
-    compressor.enableDigital(); // sets motors to brake when 0 commands are given
+    compressor.enableDigital();
+     // sets motors to brake when 0 commands are given
   }
 
   @Override
@@ -216,10 +217,12 @@ public class Robot extends TimedRobot {
     if (armMode == 0) {
       if (Math.abs(a_rightTrigger-a_leftTrigger) > armDeadband) {
         bottomArm.set(a_rightTrigger-a_leftTrigger);
+      } else {
+        bottomArm.set(0);
       }
       if (Math.abs(a_rightStickY) > armDeadband) {
         armPos = armPos - a_rightStickY*armManualRate;
-      }
+      } 
       topArm.set(ControlMode.MotionMagic, armPos - a_leftStickY*encoderTicksPerRev*armPIDRange);
     } else if (armMode == 1) {
       if (!bottomArmAtSetpoint) {
@@ -238,11 +241,11 @@ public class Robot extends TimedRobot {
       if (!topArmAtSetpoint) {
         topArm.set(ControlMode.MotionMagic, topArmSetpoint1*encoderTicksPerRev);
       }
-      if ((Math.abs(positionTopArm - topArmSetpoint1*encoderTicksPerRev)) < topArmTolerance) {
+      if ((Math.abs(positionTopArm - topArmSetpoint1)) < topArmTolerance) {
         topArmAtSetpoint = true;
       }
 
-      if (topArmAtSetpoint && bottomArmAtSetpoint && !armAtSetpoint) {
+      if (topArmAtSetpoint && bottomArmAtSetpoint) {
         armAtSetpoint = true;
       }
 
@@ -269,11 +272,11 @@ public class Robot extends TimedRobot {
       if (!topArmAtSetpoint) {
         topArm.set(ControlMode.MotionMagic, topArmSetpoint2*encoderTicksPerRev);
       }
-      if ((Math.abs(positionTopArm - topArmSetpoint2*encoderTicksPerRev)) < topArmTolerance) {
+      if ((Math.abs(positionTopArm - topArmSetpoint2)) < topArmTolerance) {
         topArmAtSetpoint = true;
       }
 
-      if (topArmAtSetpoint && bottomArmAtSetpoint && !armAtSetpoint) {
+      if (topArmAtSetpoint && bottomArmAtSetpoint) {
         armAtSetpoint = true;
       }
 
@@ -300,11 +303,11 @@ public class Robot extends TimedRobot {
       if (!topArmAtSetpoint) {
         topArm.set(ControlMode.MotionMagic, topArmSetpoint3*encoderTicksPerRev);
       }
-      if ((Math.abs(positionTopArm - topArmSetpoint3*encoderTicksPerRev)) < topArmTolerance) {
+      if ((Math.abs(positionTopArm - topArmSetpoint3)) < topArmTolerance) {
         topArmAtSetpoint = true;
       }
 
-      if (topArmAtSetpoint && bottomArmAtSetpoint && !armAtSetpoint) {
+      if (topArmAtSetpoint && bottomArmAtSetpoint) {
         armAtSetpoint = true;
       }
 
@@ -331,11 +334,11 @@ public class Robot extends TimedRobot {
       if (!topArmAtSetpoint) {
         topArm.set(ControlMode.MotionMagic, topArmSetpoint4*encoderTicksPerRev);
       }
-      if ((Math.abs(positionTopArm - topArmSetpoint4*encoderTicksPerRev)) < topArmTolerance) {
+      if ((Math.abs(positionTopArm - topArmSetpoint4)) < topArmTolerance) {
         topArmAtSetpoint = true;
       }
 
-      if (topArmAtSetpoint && bottomArmAtSetpoint && !armAtSetpoint) {
+      if (topArmAtSetpoint && bottomArmAtSetpoint) {
         armAtSetpoint = true;
       }
 
@@ -488,5 +491,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putBoolean("Coast", coast);
     SmartDashboard.putNumber("armMode", armMode);
     SmartDashboard.putBoolean("At Setpoint", armAtSetpoint);
+    SmartDashboard.putBoolean("Top At Setpoint", topArmAtSetpoint);
+    SmartDashboard.putBoolean("Bottom At Setpoint", bottomArmAtSetpoint);
   }
 }
