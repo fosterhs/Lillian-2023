@@ -429,13 +429,14 @@ public class Robot extends TimedRobot {
     topArm.config_kD(0, 10);
     topArm.configMotionAcceleration(16000);
     topArm.configMotionCruiseVelocity(50000);
-    topArm.configMaxIntegralAccumulator(0, 0.8);
+    topArm.configMaxIntegralAccumulator(0, 0.2);
     topArm.config_IntegralZone(0, 20000);
     topArm.configAllowableClosedloopError(0, 100);
 
     bottomArm.restoreFactoryDefaults(); // resets bottomArm to default
     bottomArm.setSmartCurrentLimit(20); // sets current limit for bottomArm in amps
     coastMotors(); // sets all motors to coast
+    bottomArm.setInverted(true);
   }
   
   // updates all program variables. should be called at the begining of every loop.
