@@ -46,33 +46,17 @@ public class Robot extends TimedRobot {
   boolean compressorToggle = false;
   boolean solenoidToggle = false;
 
-  // Manual Arm Control Variables
-  double armManualRate = 800;
-  double armPIDRange = 0.05;
-  double bottomArmTolerance = 0.01;
-  double topArmTolerance = 0.01;
+  // Arm Control Variables
+  double armCoarseAdjustRate = 500;
+  double armFineAdjustRange = 0.04;
+  double bottomArmTolerance = 0.005;
+  double topArmTolerance = 0.005;
   double armDeadband = 0.05;
-  double armPos = 0;
-  int armMode = 0;
-  boolean armAtSetpoint = false;
-  boolean bottomArmAtSetpoint = false;
-  boolean topArmAtSetpoint = false;
-  
-  // Arm Setpoint 1 Variables
-  double bottomArmSetpoint1 = 0;
-  double topArmSetpoint1 = -0.1;
-
-  // Arm Setpoint 2 Variables
-  double bottomArmSetpoint2 = 0.05;
-  double topArmSetpoint2 = -0.05;
-
-  // Arm Setpoint 3 Variables
-  double bottomArmSetpoint3 = 0.1;
-  double topArmSetpoint3 = 0.05;
-
-  // Arm Setpoint 4 Variables
-  double bottomArmSetpoint4 = 0.15;
-  double topArmSetpoint4 = 0.1;
+  double topArmSetpoint = 0;
+  double bottomArmSetpoint = 0;
+  boolean armAtSetpoint = true;
+  boolean bottomArmAtSetpoint = true;
+  boolean topArmAtSetpoint = true;
   
   // Drive Variables
   SlewRateLimiter slewSpeedController = new SlewRateLimiter(0.60);
@@ -165,189 +149,77 @@ public class Robot extends TimedRobot {
       }
 
     drive.arcadeDrive(translation, rotation);
-
-    if (armController.getAButtonPressed()) {  // armMode: 1
-      if (armMode == 1) {
-        armMode = 0;
-        armPos = positionTopArm;
-      } else {
-        armMode = 1;
-      }
+    
+    // Arm actuation code
+    if (armController.getAButtonPressed()) {
+      bottomArmSetpoint = 0;
+      topArmSetpoint = -0.1;
       armAtSetpoint = false;
       bottomArmAtSetpoint = false;
       topArmAtSetpoint = false;
     }
-
-    if (armController.getBButtonPressed()) {  // armMode: 2
-      if (armMode == 2) {
-        armMode = 0;
-        armPos = positionTopArm;
-      } else {
-        armMode = 2;
-      }
+    if (armController.getBButtonPressed()) {
+      bottomArmSetpoint = 0.05;
+      topArmSetpoint = -0.05;
       armAtSetpoint = false;
       bottomArmAtSetpoint = false;
       topArmAtSetpoint = false;
     }
-
-    if (armController.getXButtonPressed()) {  // armMode: 3
-      if (armMode == 3) {
-        armMode = 0;
-        armPos = positionTopArm;
-      } else {
-        armMode = 3;
-      }
+    if (armController.getXButtonPressed()) {
+      bottomArmSetpoint = 0.1;
+      topArmSetpoint = 0.05;
       armAtSetpoint = false;
       bottomArmAtSetpoint = false;
       topArmAtSetpoint = false;
     }
-
-    if (armController.getYButtonPressed()) {  // armMode: 4
-      if (armMode == 4) {
-        armMode = 0;
-        armPos = positionTopArm;
-      } else {
-        armMode = 4;
-      }
+    if (armController.getYButtonPressed()) {
+      bottomArmSetpoint = 0.15;
+      topArmSetpoint = 0.1;
       armAtSetpoint = false;
       bottomArmAtSetpoint = false;
       topArmAtSetpoint = false;
     }
+    if (armController.getLeftBumperPressed()) {
+      topArmSetpoint = positionTopArm;
+      armAtSetpoint = true;
+    }
 
-    if (armMode == 0) {
+    if (!armAtSetpoint) {
+      if (!bottomArmAtSetpoint) {
+        if (positionBottomArm < bottomArmSetpoint) {
+          bottomArm.set(1);
+        } 
+        else if (positionBottomArm > bottomArmSetpoint) {
+          bottomArm.set(-1);
+        }
+        if ((Math.abs(positionBottomArm - bottomArmSetpoint)) < bottomArmTolerance) {
+          bottomArmAtSetpoint = true;
+          bottomArm.set(0);
+        }
+      }
+
+      if (!topArmAtSetpoint) {
+        topArm.set(ControlMode.MotionMagic, topArmSetpoint*encoderTicksPerRev);
+      }
+      if ((Math.abs(positionTopArm - topArmSetpoint)) < topArmTolerance) {
+        topArmAtSetpoint = true;
+      }
+
+      if (topArmAtSetpoint && bottomArmAtSetpoint) {
+        armAtSetpoint = true;
+      }
+    }
+
+    if (armAtSetpoint) {
       if (Math.abs(a_rightTrigger-a_leftTrigger) > armDeadband) {
         bottomArm.set(a_rightTrigger-a_leftTrigger);
       } else {
         bottomArm.set(0);
       }
       if (Math.abs(a_rightStickY) > armDeadband) {
-        armPos = armPos - a_rightStickY*armManualRate;
+        topArmSetpoint = topArmSetpoint - a_rightStickY*armCoarseAdjustRate;
       } 
-      topArm.set(ControlMode.MotionMagic, armPos - a_leftStickY*encoderTicksPerRev*armPIDRange);
-    } else if (armMode == 1) {
-      if (!bottomArmAtSetpoint) {
-        if (positionBottomArm < bottomArmSetpoint1) {
-          bottomArm.set(1);
-        } 
-        else if (positionBottomArm > bottomArmSetpoint1) {
-          bottomArm.set(-1);
-        }
-        if ((Math.abs(positionBottomArm - bottomArmSetpoint1)) < bottomArmTolerance) {
-          bottomArmAtSetpoint = true;
-          bottomArm.set(0);
-        }
-      }
-
-      if (!topArmAtSetpoint) {
-        topArm.set(ControlMode.MotionMagic, topArmSetpoint1*encoderTicksPerRev);
-      }
-      if ((Math.abs(positionTopArm - topArmSetpoint1)) < topArmTolerance) {
-        topArmAtSetpoint = true;
-      }
-
-      if (topArmAtSetpoint && bottomArmAtSetpoint) {
-        armAtSetpoint = true;
-      }
-
-      if (topArmAtSetpoint) {
-        if (Math.abs(a_rightTrigger-a_leftTrigger) > armDeadband) {
-          bottomArm.set(a_rightTrigger-a_leftTrigger);
-        }
-        topArm.set(ControlMode.MotionMagic, topArmSetpoint1*encoderTicksPerRev - a_leftStickY*encoderTicksPerRev*armPIDRange);
-      }
-    } else if (armMode == 2) {
-      if (!bottomArmAtSetpoint) {
-        if (positionBottomArm < bottomArmSetpoint2) {
-          bottomArm.set(1);
-        } 
-        else if (positionBottomArm > bottomArmSetpoint2) {
-          bottomArm.set(-1);
-        }
-        if ((Math.abs(positionBottomArm - bottomArmSetpoint2)) < bottomArmTolerance) {
-          bottomArmAtSetpoint = true;
-          bottomArm.set(0);
-        }
-      }
-
-      if (!topArmAtSetpoint) {
-        topArm.set(ControlMode.MotionMagic, topArmSetpoint2*encoderTicksPerRev);
-      }
-      if ((Math.abs(positionTopArm - topArmSetpoint2)) < topArmTolerance) {
-        topArmAtSetpoint = true;
-      }
-
-      if (topArmAtSetpoint && bottomArmAtSetpoint) {
-        armAtSetpoint = true;
-      }
-
-      if (topArmAtSetpoint) {
-        if (Math.abs(a_rightTrigger-a_leftTrigger) > armDeadband) {
-          bottomArm.set(a_rightTrigger-a_leftTrigger);
-        }
-        topArm.set(ControlMode.MotionMagic, topArmSetpoint2*encoderTicksPerRev - a_leftStickY*encoderTicksPerRev*armPIDRange);
-      } 
-    } else if (armMode == 3) {
-      if (!bottomArmAtSetpoint) {
-        if (positionBottomArm < bottomArmSetpoint3) {
-          bottomArm.set(1);
-        } 
-        else if (positionBottomArm > bottomArmSetpoint3) {
-          bottomArm.set(-1);
-        }
-        if ((Math.abs(positionBottomArm - bottomArmSetpoint3)) < bottomArmTolerance) {
-          bottomArmAtSetpoint = true;
-          bottomArm.set(0);
-        }
-      }
-
-      if (!topArmAtSetpoint) {
-        topArm.set(ControlMode.MotionMagic, topArmSetpoint3*encoderTicksPerRev);
-      }
-      if ((Math.abs(positionTopArm - topArmSetpoint3)) < topArmTolerance) {
-        topArmAtSetpoint = true;
-      }
-
-      if (topArmAtSetpoint && bottomArmAtSetpoint) {
-        armAtSetpoint = true;
-      }
-
-      if (topArmAtSetpoint) {
-        if (Math.abs(a_rightTrigger-a_leftTrigger) > armDeadband) {
-          bottomArm.set(a_rightTrigger-a_leftTrigger);
-        }
-        topArm.set(ControlMode.MotionMagic, topArmSetpoint3*encoderTicksPerRev - a_leftStickY*encoderTicksPerRev*armPIDRange);
-      } 
-    } else if (armMode == 4) {
-      if (!bottomArmAtSetpoint) {
-        if (positionBottomArm < bottomArmSetpoint4) {
-          bottomArm.set(1);
-        } 
-        else if (positionBottomArm > bottomArmSetpoint4) {
-          bottomArm.set(-1);
-        }
-        if ((Math.abs(positionBottomArm - bottomArmSetpoint4)) < bottomArmTolerance) {
-          bottomArmAtSetpoint = true;
-          bottomArm.set(0);
-        }
-      }
-
-      if (!topArmAtSetpoint) {
-        topArm.set(ControlMode.MotionMagic, topArmSetpoint4*encoderTicksPerRev);
-      }
-      if ((Math.abs(positionTopArm - topArmSetpoint4)) < topArmTolerance) {
-        topArmAtSetpoint = true;
-      }
-
-      if (topArmAtSetpoint && bottomArmAtSetpoint) {
-        armAtSetpoint = true;
-      }
-
-      if (topArmAtSetpoint) {
-        if (Math.abs(a_rightTrigger-a_leftTrigger) > armDeadband) {
-          bottomArm.set(a_rightTrigger-a_leftTrigger);
-        }
-        topArm.set(ControlMode.MotionMagic, topArmSetpoint4*encoderTicksPerRev - a_leftStickY*encoderTicksPerRev*armPIDRange);
-      }
+      topArm.set(ControlMode.MotionMagic, topArmSetpoint - a_leftStickY*encoderTicksPerRev*armFineAdjustRange);
     }
   }
 
@@ -490,7 +362,6 @@ public class Robot extends TimedRobot {
     SmartDashboard.putBoolean("Compressor", compressorToggle);
     SmartDashboard.putBoolean("Solenoid", solenoidToggle);
     SmartDashboard.putBoolean("Coast", coast);
-    SmartDashboard.putNumber("armMode", armMode);
     SmartDashboard.putBoolean("At Setpoint", armAtSetpoint);
     SmartDashboard.putBoolean("Top At Setpoint", topArmAtSetpoint);
     SmartDashboard.putBoolean("Bottom At Setpoint", bottomArmAtSetpoint);
