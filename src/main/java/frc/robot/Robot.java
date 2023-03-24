@@ -1,9 +1,13 @@
 package frc.robot;
 
+import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.filter.SlewRateLimiter;
+
+import com.revrobotics.AbsoluteEncoder;
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.RelativeEncoder;
+import com.revrobotics.SparkMaxAbsoluteEncoder;
 import com.revrobotics.SparkMaxRelativeEncoder;
 import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
@@ -35,6 +39,7 @@ public class Robot extends TimedRobot {
   XboxController driveController = new XboxController(0);
   XboxController armController = new XboxController(1);
   RelativeEncoder bottomArmEncoder = bottomArm.getEncoder(SparkMaxRelativeEncoder.Type.kQuadrature, 2048); //bottom arm encoder
+  // AbsoluteEncoder bottomArmEncoderAbs = bottomArm.getAbsoluteEncoder(SparkMaxAbsoluteEncoder.Type.kDutyCycle);
   AHRS gyro = new AHRS(); // NavX2 gyro
   Timer timer = new Timer(); 
   double encoderTicksPerMeter = 2048*10.71/(0.0254*6*Math.PI); // theoretical 45812 ticks per meter traveled
@@ -49,7 +54,7 @@ public class Robot extends TimedRobot {
 
   // Arm Control Variables
   double armCoarseAdjustRate = 0.008;
-  double armFineAdjustRange = 0.04;
+  double armFineAdjustRange = 0.02;
   double bottomArmTolerance = 0.005;
   double topArmTolerance = 0.005;
   double armDeadband = 0.05;
@@ -63,7 +68,7 @@ public class Robot extends TimedRobot {
   SlewRateLimiter slewSpeedController = new SlewRateLimiter(0.60);
   SlewRateLimiter slewRotationController = new SlewRateLimiter(60.0);
   double maxRotationSpeed = 0.40;
-  double minJoystickResponse = 0.24;
+  double minJoystickResponse = 0.25;
 
   // Controller Variables
   double d_leftStickY;
@@ -91,9 +96,10 @@ public class Robot extends TimedRobot {
   double time;
   double yaw;
   double pitch;
-  int autoStage = 1;
-  PIDController pidSpeed = new PIDController(1, 0.2, 1);
-  PIDController pidRotate = new PIDController(0.04, 0, 0);
+  int autoStage = 4;
+  PIDController pidSpeed = new PIDController(1, 0.2, 0.2);
+  PIDController pidRotate = new PIDController(0.008, 0.003, 0.002);
+  int settleInterations = 0;
 
   @Override
   public void robotInit() {
@@ -103,6 +109,7 @@ public class Robot extends TimedRobot {
     gyro.zeroYaw();
     timer.start();
     updateVariables();
+    // CameraServer.startAutomaticCapture();
   }
 
   @Override
@@ -116,9 +123,9 @@ public class Robot extends TimedRobot {
     
     // Auto Arm Variables
     bottomArmSetpoint = 0.15;
-    topArmSetpoint = 0.1;
+    topArmSetpoint = 0.115;
     armAtSetpoint = false;
-    bottomArmAtSetpoint = false;
+    bottomArmAtSetpoint = true;
     topArmAtSetpoint = false;
   }
 
@@ -127,7 +134,7 @@ public class Robot extends TimedRobot {
     updateVariables();
     if (autoStage == 1) {
       solenoid.set(DoubleSolenoid.Value.kForward);
-      drive.feed();
+      drive.arcadeDrive(0, 0);
       if (!armAtSetpoint) {
         if (!bottomArmAtSetpoint) {
           if (positionBottomArm < bottomArmSetpoint) {
@@ -157,7 +164,7 @@ public class Robot extends TimedRobot {
     } else if (autoStage == 2) {
       solenoid.set(DoubleSolenoid.Value.kReverse);
       autoStage++;
-      drive.feed();
+      drive.arcadeDrive(0, 0);
     } else if (autoStage == 3) {
       // Robot moves 2 meters forward
       double averagePosition = (positionLeftBack + positionLeftFront + positionRightBack + positionRightFront)/4;
@@ -167,7 +174,7 @@ public class Robot extends TimedRobot {
         autoStage++;
       }
     } else {
-      drive.feed();
+      drive.arcadeDrive(0, 0);
     }
   }
 
@@ -184,19 +191,18 @@ public class Robot extends TimedRobot {
     updateVariables();
     // Pneumatics Code
     // Right Bumper will toggle the solenoid
-    if (armController.getRightBumperPressed()) {
-      solenoidToggle = !solenoidToggle;
-    }
-    if (solenoidToggle) {
+    if (armController.getLeftBumperPressed()) {
       solenoid.set(DoubleSolenoid.Value.kForward);
-    } else {
+    }
+
+    if (armController.getRightBumperPressed()) {
       solenoid.set(DoubleSolenoid.Value.kReverse);
     }
 
     // sets motor speeds based on controller inputs with slew rate and max speed protections.
     // left stick Y controls speed, right stick X controls rotation.
     double translation = 0;
-    if (Math.abs(d_leftStickY) > 0.02) {
+    if (Math.abs(d_leftStickY) > 0.04) {
       if (d_leftStickY > 0) {
         translation = -minJoystickResponse-(1-minJoystickResponse)*d_leftStickY*d_leftStickY;
       } else {
@@ -204,47 +210,65 @@ public class Robot extends TimedRobot {
       }
    }
    double rotation = 0;
-   if (Math.abs(d_rightStickX) > 0.02) {
+   if (Math.abs(d_rightStickX) > 0.04) {
      if (d_rightStickX > 0) {
-       rotation = -minJoystickResponse-(0.6-minJoystickResponse)*d_rightStickX*d_rightStickX;
+       rotation = -minJoystickResponse-(0.5-minJoystickResponse)*d_rightStickX*d_rightStickX;
      } else {
-      rotation = minJoystickResponse+(0.6-minJoystickResponse)*d_rightStickX*d_rightStickX;
+      rotation = minJoystickResponse+(0.5-minJoystickResponse)*d_rightStickX*d_rightStickX;
      }
    }
-    drive.arcadeDrive(translation, rotation);
+    drive.arcadeDrive(-translation, rotation);
     
     // Arm actuation code
+
+    // Carrying position
     if (armController.getAButtonPressed()) {
-      bottomArmSetpoint = 0;
-      topArmSetpoint = -0.1;
+      bottomArmSetpoint = -0.1;
+      topArmSetpoint = -0.074;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = false;
+      bottomArmAtSetpoint = true;
       topArmAtSetpoint = false;
     }
+
+    // Middle scoring node (3)
     if (armController.getBButtonPressed()) {
-      bottomArmSetpoint = 0.05;
-      topArmSetpoint = -0.05;
+      bottomArmSetpoint = 0;
+      topArmSetpoint = 0.115;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = false;
+      bottomArmAtSetpoint = true;
       topArmAtSetpoint = false;
     }
+    
+    // Floor scoring position (1)
     if (armController.getXButtonPressed()) {
-      bottomArmSetpoint = 0.1;
-      topArmSetpoint = 0.05;
+      bottomArmSetpoint = 0;
+      topArmSetpoint = -0.321;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = false;
+      bottomArmAtSetpoint = true;
       topArmAtSetpoint = false;
     }
+   
+    // Lowest scoring position from top (2)
     if (armController.getYButtonPressed()) {
       bottomArmSetpoint = 0.15;
-      topArmSetpoint = 0.1;
+      topArmSetpoint = 0.058;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = false;
+      bottomArmAtSetpoint = true;
       topArmAtSetpoint = false;
     }
-    if (armController.getLeftBumperPressed()) {
+    
+    if (armController.getStartButtonPressed()) {
       topArmSetpoint = positionTopArm;
       armAtSetpoint = true;
+    }
+
+    // Vertical Position
+    if (armController.getBackButtonPressed()) {
+      bottomArmSetpoint = 0.15;
+      topArmSetpoint = 0;
+      armAtSetpoint = false;
+      bottomArmAtSetpoint = true;
+      topArmAtSetpoint = false;
     }
 
     if (!armAtSetpoint) {
@@ -336,9 +360,9 @@ public class Robot extends TimedRobot {
     motor.configFactoryDefault();
     TalonFXConfiguration config = new TalonFXConfiguration();
     config.supplyCurrLimit.enable = true;
-    config.supplyCurrLimit.triggerThresholdCurrent = 40; // max current in amps
+    config.supplyCurrLimit.triggerThresholdCurrent = 10; // max current in amps
     config.supplyCurrLimit.triggerThresholdTime = 0; // max time exceeding max current in seconds
-    config.supplyCurrLimit.currentLimit = 40; // max current after exceeding threshold 
+    config.supplyCurrLimit.currentLimit = 10; // max current after exceeding threshold 
     motor.configAllSettings(config);
     motor.setSelectedSensorPosition(0); // sets encoder to 0
   }
@@ -354,9 +378,9 @@ public class Robot extends TimedRobot {
     rightBack.setInverted(true);
     rightFront.setInverted(true);
 
-    topArm.configPeakOutputForward(0.25); // limits topArm to 25% power in forwards direction
-    topArm.configPeakOutputReverse(-0.25); // limits topArm to 25% power in backwards direction
-    topArm.configClosedLoopPeakOutput(0, 0.25); // limits topArm to 25% power during Motion Magic and other closed loop control
+    topArm.configPeakOutputForward(1); // limits topArm to 25% power in forwards direction
+    topArm.configPeakOutputReverse(-1); // limits topArm to 25% power in backwards direction
+    topArm.configClosedLoopPeakOutput(0, 1); // limits topArm to 25% power during Motion Magic and other closed loop control
     
     // sets motion magic parameters for topArm motor
     topArm.config_kP(0, 1);
@@ -380,6 +404,7 @@ public class Robot extends TimedRobot {
     if (positionBottomArm > 140) { // Resolves encoder negative overrun issue
       positionBottomArm = positionBottomArm - 274.6583251953125;
     }
+    //positionBottomArm = bottomArmEncoderAbs.getPosition();
     positionTopArm = topArm.getSelectedSensorPosition()/encoderTicksPerRev; // 0-1 represents 1 full revolution of the top arm. Starts at 0.
     positionLeftBack = leftBack.getSelectedSensorPosition()/encoderTicksPerMeter; // wheel distance in meters. Starts at 0.
     positionLeftFront = leftFront.getSelectedSensorPosition()/encoderTicksPerMeter; // wheel distance in meters. Starts at 0. 
