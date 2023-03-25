@@ -97,7 +97,8 @@ public class Robot extends TimedRobot {
   double yaw;
   double pitch;
   int autoStage = 4;
-  PIDController pidSpeed = new PIDController(1, 0.2, 0.2);
+  PIDController pidSpeed = new PIDController(1, 0.2, 0.2
+  );
   PIDController pidRotate = new PIDController(0.008, 0.003, 0.002);
   int settleInterations = 0;
 
@@ -109,7 +110,7 @@ public class Robot extends TimedRobot {
     gyro.zeroYaw();
     timer.start();
     updateVariables();
-    // CameraServer.startAutomaticCapture();
+    CameraServer.startAutomaticCapture();
   }
 
   @Override
@@ -168,9 +169,9 @@ public class Robot extends TimedRobot {
     } else if (autoStage == 3) {
       // Robot moves 2 meters forward
       double averagePosition = (positionLeftBack + positionLeftFront + positionRightBack + positionRightFront)/4;
-      double translation = pidSpeed.calculate(averagePosition, 2);
+      double translation = pidSpeed.calculate(averagePosition, 4);
       drive.arcadeDrive(translation, 0);
-      if (averagePosition > 2) {
+      if (averagePosition > 4) {
         autoStage++;
       }
     } else {
@@ -319,9 +320,11 @@ public class Robot extends TimedRobot {
   @Override
   public void disabledPeriodic() {
     updateVariables();
+    /* 
     if (!coast && time > 2) { // Sets the motors to coast after 2 seconds
       coastMotors();
     }
+    */
   }
 
   @Override
@@ -394,7 +397,8 @@ public class Robot extends TimedRobot {
 
     bottomArm.restoreFactoryDefaults(); // resets bottomArm to default
     bottomArm.setSmartCurrentLimit(20); // sets current limit for bottomArm in amps
-    coastMotors(); // sets all motors to coast
+    brakeMotors();
+    //coastMotors(); // sets all motors to coast
     bottomArm.setInverted(true);
   }
   
