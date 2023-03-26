@@ -45,6 +45,7 @@ public class Robot extends TimedRobot {
   double encoderTicksPerMeter = 2048*10.71/(0.0254*6*Math.PI); // theoretical 45812 ticks per meter traveled
   double encoderTicksPerRev = 2048*12*64/18; // theoretical 87381 ticks per revolution of top arm
   boolean coast = true;
+  double stage2StartTime;
 
   // Pneumatics Variables
   Compressor compressor = new Compressor(0, PneumaticsModuleType.CTREPCM);
@@ -96,7 +97,7 @@ public class Robot extends TimedRobot {
   double time;
   double yaw;
   double pitch;
-  int autoStage = 4;
+  int autoStage = 1;
   PIDController pidSpeed = new PIDController(1, 0.2, 0.2
   );
   PIDController pidRotate = new PIDController(0.008, 0.003, 0.002);
@@ -110,7 +111,8 @@ public class Robot extends TimedRobot {
     gyro.zeroYaw();
     timer.start();
     updateVariables();
-    CameraServer.startAutomaticCapture();
+    //CameraServer.startAutomaticCapture(0);
+    //CameraServer.startAutomaticCapture(1);
   }
 
   @Override
@@ -123,8 +125,9 @@ public class Robot extends TimedRobot {
     compressor.enableDigital();
     
     // Auto Arm Variables
-    bottomArmSetpoint = 0.15;
-    topArmSetpoint = 0.115;
+    bottomArmSetpoint = 0;
+    //topArmSetpoint = 0.233;
+    topArmSetpoint = 0.141;
     armAtSetpoint = false;
     bottomArmAtSetpoint = true;
     topArmAtSetpoint = false;
@@ -134,7 +137,7 @@ public class Robot extends TimedRobot {
   public void autonomousPeriodic() {
     updateVariables();
     if (autoStage == 1) {
-      solenoid.set(DoubleSolenoid.Value.kForward);
+      solenoid.set(DoubleSolenoid.Value.kReverse);
       drive.arcadeDrive(0, 0);
       if (!armAtSetpoint) {
         if (!bottomArmAtSetpoint) {
@@ -159,22 +162,38 @@ public class Robot extends TimedRobot {
   
         if (topArmAtSetpoint && bottomArmAtSetpoint) {
           armAtSetpoint = true;
+          stage2StartTime = timer.get();
           autoStage++;
         }
       }     
     } else if (autoStage == 2) {
-      solenoid.set(DoubleSolenoid.Value.kReverse);
-      autoStage++;
-      drive.arcadeDrive(0, 0);
-    } else if (autoStage == 3) {
-      // Robot moves 2 meters forward
-      double averagePosition = (positionLeftBack + positionLeftFront + positionRightBack + positionRightFront)/4;
-      double translation = pidSpeed.calculate(averagePosition, 4);
-      drive.arcadeDrive(translation, 0);
-      if (averagePosition > 4) {
+      if ((timer.get() - stage2StartTime) > 2.0) {
+        solenoid.set(DoubleSolenoid.Value.kForward);
         autoStage++;
       }
-    } else {
+      drive.arcadeDrive(0, 0);
+    }  else if (autoStage == 3) {
+      // Robot moves 2 meters forward
+      double averagePosition = (positionLeftBack + positionLeftFront + positionRightBack + positionRightFront)/4;
+      double translation = pidSpeed.calculate(averagePosition, 3.2);
+      drive.arcadeDrive(translation, 0);
+      if (averagePosition > 3.2) {
+        topArmAtSetpoint = false;
+        autoStage++;
+      }
+    } else if (autoStage == 4) {
+      topArmSetpoint = -0.246;
+      drive.arcadeDrive(0, 0);
+      if (!topArmAtSetpoint) {
+        topArm.set(ControlMode.MotionMagic, topArmSetpoint*encoderTicksPerRev);
+      }
+      if ((Math.abs(positionTopArm - topArmSetpoint)) < topArmTolerance) {
+        topArmAtSetpoint = true;
+        autoStage++;
+      }
+    }
+
+    else {
       drive.arcadeDrive(0, 0);
     }
   }
@@ -218,41 +237,41 @@ public class Robot extends TimedRobot {
       rotation = minJoystickResponse+(0.5-minJoystickResponse)*d_rightStickX*d_rightStickX;
      }
    }
-    drive.arcadeDrive(-translation, rotation);
+    drive.arcadeDrive(translation, rotation);
     
     // Arm actuation code
 
-    // Carrying position
+    // Drive carrying position
     if (armController.getAButtonPressed()) {
-      bottomArmSetpoint = -0.1;
-      topArmSetpoint = -0.074;
+      bottomArmSetpoint = 0;
+      topArmSetpoint = 0;
       armAtSetpoint = false;
       bottomArmAtSetpoint = true;
       topArmAtSetpoint = false;
     }
 
-    // Middle scoring node (3)
+    // Middle level scoring (back-up)
     if (armController.getBButtonPressed()) {
       bottomArmSetpoint = 0;
-      topArmSetpoint = 0.115;
+      topArmSetpoint = 0.198;
       armAtSetpoint = false;
       bottomArmAtSetpoint = true;
       topArmAtSetpoint = false;
     }
     
-    // Floor scoring position (1)
+    // Front floor pickup/score
     if (armController.getXButtonPressed()) {
       bottomArmSetpoint = 0;
-      topArmSetpoint = -0.321;
+      topArmSetpoint = -0.251;
       armAtSetpoint = false;
       bottomArmAtSetpoint = true;
       topArmAtSetpoint = false;
     }
    
-    // Lowest scoring position from top (2)
+    // Floor scoring (back-up)
     if (armController.getYButtonPressed()) {
-      bottomArmSetpoint = 0.15;
-      topArmSetpoint = 0.058;
+      bottomArmSetpoint = 0;
+      topArmSetpoint = 0.141;
       armAtSetpoint = false;
       bottomArmAtSetpoint = true;
       topArmAtSetpoint = false;
@@ -271,6 +290,24 @@ public class Robot extends TimedRobot {
       bottomArmAtSetpoint = true;
       topArmAtSetpoint = false;
     }
+
+        // Substation pickup position
+        if (a_leftTrigger > 0.5) {
+          bottomArmSetpoint = 0;
+          topArmSetpoint = 0.238;
+          armAtSetpoint = false;
+          bottomArmAtSetpoint = true;
+          topArmAtSetpoint = false;
+        }
+
+                // Cone low position
+                if (a_rightTrigger > 0.5) {
+                  bottomArmSetpoint = 0.119;
+                  topArmSetpoint = 0;
+                  armAtSetpoint = false;
+                  bottomArmAtSetpoint = true;
+                  topArmAtSetpoint = false;
+                }
 
     if (!armAtSetpoint) {
       if (!bottomArmAtSetpoint) {
@@ -328,7 +365,9 @@ public class Robot extends TimedRobot {
   }
 
   @Override
-  public void testInit() {}
+  public void testInit() {
+    compressor.enableDigital();
+  }
 
   @Override
   public void testPeriodic() {}
