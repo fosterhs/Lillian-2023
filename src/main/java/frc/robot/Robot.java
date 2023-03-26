@@ -98,8 +98,7 @@ public class Robot extends TimedRobot {
   double yaw;
   double pitch;
   int autoStage = 1;
-  PIDController pidSpeed = new PIDController(1, 0.2, 0.2
-  );
+  PIDController pidSpeed = new PIDController(1, 0.2, 0.2);
   PIDController pidRotate = new PIDController(0.008, 0.003, 0.002);
   int settleInterations = 0;
 
@@ -111,8 +110,6 @@ public class Robot extends TimedRobot {
     gyro.zeroYaw();
     timer.start();
     updateVariables();
-    //CameraServer.startAutomaticCapture(0);
-    //CameraServer.startAutomaticCapture(1);
   }
 
   @Override
@@ -126,7 +123,6 @@ public class Robot extends TimedRobot {
     
     // Auto Arm Variables
     bottomArmSetpoint = 0;
-    //topArmSetpoint = 0.233;
     topArmSetpoint = 0.141;
     armAtSetpoint = false;
     bottomArmAtSetpoint = true;
@@ -136,7 +132,7 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     updateVariables();
-    if (autoStage == 1) {
+    if (autoStage == 1) { // Moves the arm to the 1st auto setpoint
       solenoid.set(DoubleSolenoid.Value.kReverse);
       drive.arcadeDrive(0, 0);
       if (!armAtSetpoint) {
@@ -162,38 +158,59 @@ public class Robot extends TimedRobot {
   
         if (topArmAtSetpoint && bottomArmAtSetpoint) {
           armAtSetpoint = true;
-          stage2StartTime = timer.get();
           autoStage++;
+          stage2StartTime = timer.get();
         }
       }     
-    } else if (autoStage == 2) {
+    } else if (autoStage == 2) { // Delays 2 seconds, then opens the claw
+      drive.arcadeDrive(0, 0);
       if ((timer.get() - stage2StartTime) > 2.0) {
         solenoid.set(DoubleSolenoid.Value.kForward);
         autoStage++;
       }
-      drive.arcadeDrive(0, 0);
-    }  else if (autoStage == 3) {
-      // Robot moves 2 meters forward
+    } else if (autoStage == 3) { // Moves forward by a set distance using PID control
       double averagePosition = (positionLeftBack + positionLeftFront + positionRightBack + positionRightFront)/4;
       double translation = pidSpeed.calculate(averagePosition, 3.2);
       drive.arcadeDrive(translation, 0);
       if (averagePosition > 3.2) {
-        topArmAtSetpoint = false;
         autoStage++;
-      }
-    } else if (autoStage == 4) {
-      topArmSetpoint = -0.246;
-      drive.arcadeDrive(0, 0);
-      if (!topArmAtSetpoint) {
-        topArm.set(ControlMode.MotionMagic, topArmSetpoint*encoderTicksPerRev);
-      }
-      if ((Math.abs(positionTopArm - topArmSetpoint)) < topArmTolerance) {
-        topArmAtSetpoint = true;
-        autoStage++;
-      }
-    }
 
-    else {
+        // 2nd Auto Arm Setpoints
+        bottomArmSetpoint = 0;
+        topArmSetpoint = -0.246;
+        armAtSetpoint = false;
+        bottomArmAtSetpoint = true;
+        topArmAtSetpoint = false;
+      }
+    } else if (autoStage == 4) { // Moves the arm to the 2nd Auto Setpoint
+      drive.arcadeDrive(0, 0);
+      if (!armAtSetpoint) {
+        if (!bottomArmAtSetpoint) {
+          if (positionBottomArm < bottomArmSetpoint) {
+            bottomArm.set(1);
+          } 
+          else if (positionBottomArm > bottomArmSetpoint) {
+            bottomArm.set(-1);
+          }
+          if ((Math.abs(positionBottomArm - bottomArmSetpoint)) < bottomArmTolerance) {
+            bottomArmAtSetpoint = true;
+            bottomArm.set(0);
+          }
+        }
+  
+        if (!topArmAtSetpoint) {
+          topArm.set(ControlMode.MotionMagic, topArmSetpoint*encoderTicksPerRev);
+        }
+        if ((Math.abs(positionTopArm - topArmSetpoint)) < topArmTolerance) {
+          topArmAtSetpoint = true;
+        }
+  
+        if (topArmAtSetpoint && bottomArmAtSetpoint) {
+          armAtSetpoint = true;
+          autoStage++;
+        }
+      }
+    } else {
       drive.arcadeDrive(0, 0);
     }
   }
@@ -209,12 +226,12 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopPeriodic() {
     updateVariables();
-    // Pneumatics Code
-    // Right Bumper will toggle the solenoid
+
+    // Left bumper: close the solenoid
     if (armController.getLeftBumperPressed()) {
       solenoid.set(DoubleSolenoid.Value.kForward);
     }
-
+    // Right bumper: open the solenoid
     if (armController.getRightBumperPressed()) {
       solenoid.set(DoubleSolenoid.Value.kReverse);
     }
@@ -240,7 +257,6 @@ public class Robot extends TimedRobot {
     drive.arcadeDrive(translation, rotation);
     
     // Arm actuation code
-
     // Drive carrying position
     if (armController.getAButtonPressed()) {
       bottomArmSetpoint = 0;
@@ -291,23 +307,23 @@ public class Robot extends TimedRobot {
       topArmAtSetpoint = false;
     }
 
-        // Substation pickup position
-        if (a_leftTrigger > 0.5) {
-          bottomArmSetpoint = 0;
-          topArmSetpoint = 0.238;
-          armAtSetpoint = false;
-          bottomArmAtSetpoint = true;
-          topArmAtSetpoint = false;
-        }
+    // Substation pickup position
+    if (a_leftTrigger > 0.5) {
+      bottomArmSetpoint = 0;
+      topArmSetpoint = 0.238;
+      armAtSetpoint = false;
+      bottomArmAtSetpoint = true;
+      topArmAtSetpoint = false;
+    }
 
-                // Cone low position
-                if (a_rightTrigger > 0.5) {
-                  bottomArmSetpoint = 0.119;
-                  topArmSetpoint = 0;
-                  armAtSetpoint = false;
-                  bottomArmAtSetpoint = true;
-                  topArmAtSetpoint = false;
-                }
+    // Cone low position
+    if (a_rightTrigger > 0.5) {
+      bottomArmSetpoint = 0.119;
+      topArmSetpoint = 0;
+      armAtSetpoint = false;
+      bottomArmAtSetpoint = true;
+      topArmAtSetpoint = false;
+    }
 
     if (!armAtSetpoint) {
       if (!bottomArmAtSetpoint) {
@@ -342,9 +358,13 @@ public class Robot extends TimedRobot {
         bottomArm.set(0);
       }
       if (Math.abs(a_rightStickY) > armDeadband) {
-        topArmSetpoint = topArmSetpoint - a_rightStickY*armCoarseAdjustRate;
+        if (a_rightStickY > 0) {
+          topArmSetpoint = topArmSetpoint - (0.1 + 0.9*a_rightStickY*a_rightStickY)*armCoarseAdjustRate;
+        } else {
+          topArmSetpoint = topArmSetpoint + (0.1 + 0.9*a_rightStickY*a_rightStickY)*armCoarseAdjustRate;
+        }
       } 
-      topArm.set(ControlMode.MotionMagic, encoderTicksPerRev*(topArmSetpoint - a_leftStickY*armFineAdjustRange));
+      topArm.set(ControlMode.MotionMagic, encoderTicksPerRev*(topArmSetpoint - a_leftStickY*a_leftStickY*armFineAdjustRange));
     }
   }
 
@@ -357,17 +377,10 @@ public class Robot extends TimedRobot {
   @Override
   public void disabledPeriodic() {
     updateVariables();
-    /* 
-    if (!coast && time > 2) { // Sets the motors to coast after 2 seconds
-      coastMotors();
-    }
-    */
   }
 
   @Override
-  public void testInit() {
-    compressor.enableDigital();
-  }
+  public void testInit() {}
 
   @Override
   public void testPeriodic() {}
@@ -419,10 +432,6 @@ public class Robot extends TimedRobot {
     // inverts right drive motors
     rightBack.setInverted(true);
     rightFront.setInverted(true);
-
-    topArm.configPeakOutputForward(1); // limits topArm to 25% power in forwards direction
-    topArm.configPeakOutputReverse(-1); // limits topArm to 25% power in backwards direction
-    topArm.configClosedLoopPeakOutput(0, 1); // limits topArm to 25% power during Motion Magic and other closed loop control
     
     // sets motion magic parameters for topArm motor
     topArm.config_kP(0, 1);
