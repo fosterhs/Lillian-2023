@@ -37,7 +37,7 @@ public class Robot extends TimedRobot {
   AHRS gyro = new AHRS(); // NavX2 gyro
   Timer timer = new Timer(); 
   double encoderTicksPerMeter = 2048*10.71/(0.0254*6*Math.PI); // theoretical 45812 ticks per meter traveled
-  double encoderTicksPerRev = 2048*12*64/16; // theoretical 87381 ticks per revolution of top arm
+  double encoderTicksPerRev = 2048*12*64/16; // theoretical 98304 ticks per revolution of top arm
   double stage2StartTime;
 
   // Pneumatics Variables
@@ -47,7 +47,6 @@ public class Robot extends TimedRobot {
 
   // Arm Control Variables
   double armCoarseAdjustRate = 0.008;
-  double armFineAdjustRange = 0.02;
   double bottomArmTolerance = 0.005;
   double topArmTolerance = 0.005;
   double armDeadband = 0.05;
@@ -297,7 +296,7 @@ public class Robot extends TimedRobot {
   public void simulationPeriodic() {}
 
   public void moveArmToSetpoint() {
-    bottomArmAtSetpoint = false;
+    bottomArmAtSetpoint = true;
     topArmAtSetpoint = false;
     
     if (!bottomArmAtSetpoint) {
