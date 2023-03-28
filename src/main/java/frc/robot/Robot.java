@@ -155,6 +155,8 @@ public class Robot extends TimedRobot {
       if (armAtSetpoint) {
         autoStage++;
       }
+    } else if (autoStage == 5) {
+        closeClaw();
     } else {
       drive.arcadeDrive(0, 0);
     }
@@ -199,50 +201,51 @@ public class Robot extends TimedRobot {
     }
     
     // Arm actuation code
+
+    // Neutral/Starting Position
+    if (armController.getStartButtonPressed()) {
+      bottomArmSetpoint = 0;
+      topArmSetpoint = 0;
+      armAtSetpoint = false;
+    }
     // Drive/Carry
     if (armController.getAButtonPressed()) {
       bottomArmSetpoint = 0;
       topArmSetpoint = 0;
       armAtSetpoint = false;
     }
-
     // Front Floor Pickup/Carry
     if (armController.getBButtonPressed()) {
       bottomArmSetpoint = 0;
       topArmSetpoint = 0.198;
       armAtSetpoint = false;
-    }
-    
+    } 
     // Double Substation Pickup
     if (armController.getXButtonPressed()) {
       bottomArmSetpoint = 0;
       topArmSetpoint = -0.251;
       armAtSetpoint = false;
     }
-   
     // Cube Scoring (Middle)
     if (armController.getYButtonPressed()) {
       bottomArmSetpoint = 0;
       topArmSetpoint = 0.141;
       armAtSetpoint = false;
     }
-
     // Cone Scoring (Middle)
     if (armController.getBackButtonPressed()) {
       bottomArmSetpoint = 0.15;
       topArmSetpoint = 0;
       armAtSetpoint = false;
     }
-
     // Cube Scoring (Top)
-    if (a_leftTrigger > 0.5) {
+    if (a_leftTrigger > 0.25) {
       bottomArmSetpoint = 0;
       topArmSetpoint = 0.238;
       armAtSetpoint = false;
     }
-
     // Cone Scoring (Top)
-    if (a_rightTrigger > 0.5) {
+    if (a_rightTrigger > 0.25) {
       bottomArmSetpoint = 0.119;
       topArmSetpoint = 0;
       armAtSetpoint = false;
