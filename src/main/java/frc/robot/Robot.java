@@ -49,7 +49,7 @@ public class Robot extends TimedRobot {
   double armCoarseAdjustRate = 0.008;
   double bottomArmTolerance = 0.005;
   double topArmTolerance = 0.005;
-  double armDeadband = 0.05;
+  double armDeadband = 0.06;
   double topArmSetpoint = 0;
   double bottomArmSetpoint = 0;
   boolean armAtSetpoint = true;
@@ -279,6 +279,7 @@ public class Robot extends TimedRobot {
       topArmSetpoint = positionTopArm;
       bottomArmSetpoint = positionBottomArm;
       armAtSetpoint = true;
+      timer.reset();
       updateVariables();
     }
   }
