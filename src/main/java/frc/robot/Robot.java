@@ -1,13 +1,8 @@
 package frc.robot;
 
-import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.math.filter.SlewRateLimiter;
-
-import com.revrobotics.AbsoluteEncoder;
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.RelativeEncoder;
-import com.revrobotics.SparkMaxAbsoluteEncoder;
 import com.revrobotics.SparkMaxRelativeEncoder;
 import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
@@ -39,18 +34,15 @@ public class Robot extends TimedRobot {
   XboxController driveController = new XboxController(0);
   XboxController armController = new XboxController(1);
   RelativeEncoder bottomArmEncoder = bottomArm.getEncoder(SparkMaxRelativeEncoder.Type.kQuadrature, 2048); //bottom arm encoder
-  // AbsoluteEncoder bottomArmEncoderAbs = bottomArm.getAbsoluteEncoder(SparkMaxAbsoluteEncoder.Type.kDutyCycle);
   AHRS gyro = new AHRS(); // NavX2 gyro
   Timer timer = new Timer(); 
   double encoderTicksPerMeter = 2048*10.71/(0.0254*6*Math.PI); // theoretical 45812 ticks per meter traveled
-  double encoderTicksPerRev = 2048*12*64/18; // theoretical 87381 ticks per revolution of top arm
-  boolean coast = true;
+  double encoderTicksPerRev = 2048*12*64/16; // theoretical 87381 ticks per revolution of top arm
   double stage2StartTime;
 
   // Pneumatics Variables
   Compressor compressor = new Compressor(0, PneumaticsModuleType.CTREPCM);
   DoubleSolenoid solenoid = new DoubleSolenoid(PneumaticsModuleType.CTREPCM, 0, 1);
-  boolean compressorToggle = false;
   boolean solenoidToggle = false;
 
   // Arm Control Variables
@@ -64,12 +56,10 @@ public class Robot extends TimedRobot {
   boolean armAtSetpoint = true;
   boolean bottomArmAtSetpoint = true;
   boolean topArmAtSetpoint = true;
+  double minJoystickTopArmResponse = 0.2;
   
   // Drive Variables
-  SlewRateLimiter slewSpeedController = new SlewRateLimiter(0.60);
-  SlewRateLimiter slewRotationController = new SlewRateLimiter(60.0);
-  double maxRotationSpeed = 0.40;
-  double minJoystickResponse = 0.25;
+  double minJoystickDriveResponse = 0.25;
 
   // Controller Variables
   double d_leftStickY;
@@ -97,9 +87,10 @@ public class Robot extends TimedRobot {
   double time;
   double yaw;
   double pitch;
+
+  // Auto Variables
   int autoStage = 1;
   PIDController pidSpeed = new PIDController(1, 0.2, 0.2);
-  PIDController pidRotate = new PIDController(0.008, 0.003, 0.002);
   int settleInterations = 0;
 
   @Override
@@ -118,54 +109,31 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousInit() {
     timer.reset();
-    brakeMotors();
     compressor.enableDigital();
     
-    // Auto Arm Variables
+    // Auto Arm First Setpoint
     bottomArmSetpoint = 0;
     topArmSetpoint = 0.141;
     armAtSetpoint = false;
-    bottomArmAtSetpoint = true;
-    topArmAtSetpoint = false;
   }
 
   @Override
   public void autonomousPeriodic() {
     updateVariables();
     if (autoStage == 1) { // Moves the arm to the 1st auto setpoint
-      solenoid.set(DoubleSolenoid.Value.kReverse);
+      closeClaw();
       drive.arcadeDrive(0, 0);
       if (!armAtSetpoint) {
-        if (!bottomArmAtSetpoint) {
-          if (positionBottomArm < bottomArmSetpoint) {
-            bottomArm.set(1);
-          } 
-          else if (positionBottomArm > bottomArmSetpoint) {
-            bottomArm.set(-1);
-          }
-          if ((Math.abs(positionBottomArm - bottomArmSetpoint)) < bottomArmTolerance) {
-            bottomArmAtSetpoint = true;
-            bottomArm.set(0);
-          }
-        }
-  
-        if (!topArmAtSetpoint) {
-          topArm.set(ControlMode.MotionMagic, topArmSetpoint*encoderTicksPerRev);
-        }
-        if ((Math.abs(positionTopArm - topArmSetpoint)) < topArmTolerance) {
-          topArmAtSetpoint = true;
-        }
-  
-        if (topArmAtSetpoint && bottomArmAtSetpoint) {
-          armAtSetpoint = true;
-          autoStage++;
-          stage2StartTime = timer.get();
-        }
-      }     
+        moveArmToSetpoint();
+      }
+      if (armAtSetpoint) {
+        autoStage++;
+        stage2StartTime = timer.get();
+      }  
     } else if (autoStage == 2) { // Delays 2 seconds, then opens the claw
       drive.arcadeDrive(0, 0);
       if ((timer.get() - stage2StartTime) > 2.0) {
-        solenoid.set(DoubleSolenoid.Value.kForward);
+        openClaw();
         autoStage++;
       }
     } else if (autoStage == 3) { // Moves forward by a set distance using PID control
@@ -174,41 +142,18 @@ public class Robot extends TimedRobot {
       drive.arcadeDrive(translation, 0);
       if (averagePosition > 3.2) {
         autoStage++;
-
-        // 2nd Auto Arm Setpoints
+        // Auto Arm Second Setpoint
         bottomArmSetpoint = 0;
         topArmSetpoint = -0.246;
         armAtSetpoint = false;
-        bottomArmAtSetpoint = true;
-        topArmAtSetpoint = false;
       }
     } else if (autoStage == 4) { // Moves the arm to the 2nd Auto Setpoint
       drive.arcadeDrive(0, 0);
       if (!armAtSetpoint) {
-        if (!bottomArmAtSetpoint) {
-          if (positionBottomArm < bottomArmSetpoint) {
-            bottomArm.set(1);
-          } 
-          else if (positionBottomArm > bottomArmSetpoint) {
-            bottomArm.set(-1);
-          }
-          if ((Math.abs(positionBottomArm - bottomArmSetpoint)) < bottomArmTolerance) {
-            bottomArmAtSetpoint = true;
-            bottomArm.set(0);
-          }
-        }
-  
-        if (!topArmAtSetpoint) {
-          topArm.set(ControlMode.MotionMagic, topArmSetpoint*encoderTicksPerRev);
-        }
-        if ((Math.abs(positionTopArm - topArmSetpoint)) < topArmTolerance) {
-          topArmAtSetpoint = true;
-        }
-  
-        if (topArmAtSetpoint && bottomArmAtSetpoint) {
-          armAtSetpoint = true;
-          autoStage++;
-        }
+        moveArmToSetpoint();
+      }
+      if (armAtSetpoint) {
+        autoStage++;
       }
     } else {
       drive.arcadeDrive(0, 0);
@@ -218,153 +163,96 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopInit() {
     timer.reset();
-    brakeMotors();
     compressor.enableDigital();
-     // sets motors to brake when 0 commands are given
   }
 
   @Override
   public void teleopPeriodic() {
     updateVariables();
 
-    // Left bumper: close the solenoid
-    if (armController.getLeftBumperPressed()) {
-      solenoid.set(DoubleSolenoid.Value.kForward);
-    }
-    // Right bumper: open the solenoid
-    if (armController.getRightBumperPressed()) {
-      solenoid.set(DoubleSolenoid.Value.kReverse);
-    }
-
-    // sets motor speeds based on controller inputs with slew rate and max speed protections.
-    // left stick Y controls speed, right stick X controls rotation.
+    // Drive Code: leftStickY controls speed, rightStickX controls rotation.
     double translation = 0;
     if (Math.abs(d_leftStickY) > 0.04) {
       if (d_leftStickY > 0) {
-        translation = -minJoystickResponse-(1-minJoystickResponse)*d_leftStickY*d_leftStickY;
+        translation = -minJoystickDriveResponse-(1-minJoystickDriveResponse)*d_leftStickY*d_leftStickY;
       } else {
-        translation = minJoystickResponse+(1-minJoystickResponse)*d_leftStickY*d_leftStickY;
+        translation = minJoystickDriveResponse+(1-minJoystickDriveResponse)*d_leftStickY*d_leftStickY;
       }
    }
    double rotation = 0;
    if (Math.abs(d_rightStickX) > 0.04) {
      if (d_rightStickX > 0) {
-       rotation = -minJoystickResponse-(0.5-minJoystickResponse)*d_rightStickX*d_rightStickX;
+       rotation = -minJoystickDriveResponse-(0.5-minJoystickDriveResponse)*d_rightStickX*d_rightStickX;
      } else {
-      rotation = minJoystickResponse+(0.5-minJoystickResponse)*d_rightStickX*d_rightStickX;
+      rotation = minJoystickDriveResponse+(0.5-minJoystickDriveResponse)*d_rightStickX*d_rightStickX;
      }
    }
     drive.arcadeDrive(translation, rotation);
+
+    // Left bumper: close the claw
+    if (armController.getLeftBumperPressed()) {
+      closeClaw();
+    }
+    // Right bumper: open the claw
+    if (armController.getRightBumperPressed()) {
+      openClaw();
+    }
     
     // Arm actuation code
-    // Drive carrying position
+    // Drive/Carry
     if (armController.getAButtonPressed()) {
       bottomArmSetpoint = 0;
       topArmSetpoint = 0;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = true;
-      topArmAtSetpoint = false;
     }
 
-    // Middle level scoring (back-up)
+    // Front Floor Pickup/Carry
     if (armController.getBButtonPressed()) {
       bottomArmSetpoint = 0;
       topArmSetpoint = 0.198;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = true;
-      topArmAtSetpoint = false;
     }
     
-    // Front floor pickup/score
+    // Double Substation Pickup
     if (armController.getXButtonPressed()) {
       bottomArmSetpoint = 0;
       topArmSetpoint = -0.251;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = true;
-      topArmAtSetpoint = false;
     }
    
-    // Floor scoring (back-up)
+    // Cube Scoring (Middle)
     if (armController.getYButtonPressed()) {
       bottomArmSetpoint = 0;
       topArmSetpoint = 0.141;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = true;
-      topArmAtSetpoint = false;
-    }
-    
-    if (armController.getStartButtonPressed()) {
-      topArmSetpoint = positionTopArm;
-      armAtSetpoint = true;
     }
 
-    // Vertical Position
+    // Cone Scoring (Middle)
     if (armController.getBackButtonPressed()) {
       bottomArmSetpoint = 0.15;
       topArmSetpoint = 0;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = true;
-      topArmAtSetpoint = false;
     }
 
-    // Substation pickup position
+    // Cube Scoring (Top)
     if (a_leftTrigger > 0.5) {
       bottomArmSetpoint = 0;
       topArmSetpoint = 0.238;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = true;
-      topArmAtSetpoint = false;
     }
 
-    // Cone low position
+    // Cone Scoring (Top)
     if (a_rightTrigger > 0.5) {
       bottomArmSetpoint = 0.119;
       topArmSetpoint = 0;
       armAtSetpoint = false;
-      bottomArmAtSetpoint = true;
-      topArmAtSetpoint = false;
     }
 
     if (!armAtSetpoint) {
-      if (!bottomArmAtSetpoint) {
-        if (positionBottomArm < bottomArmSetpoint) {
-          bottomArm.set(1);
-        } 
-        else if (positionBottomArm > bottomArmSetpoint) {
-          bottomArm.set(-1);
-        }
-        if ((Math.abs(positionBottomArm - bottomArmSetpoint)) < bottomArmTolerance) {
-          bottomArmAtSetpoint = true;
-          bottomArm.set(0);
-        }
-      }
-
-      if (!topArmAtSetpoint) {
-        topArm.set(ControlMode.MotionMagic, topArmSetpoint*encoderTicksPerRev);
-      }
-      if ((Math.abs(positionTopArm - topArmSetpoint)) < topArmTolerance) {
-        topArmAtSetpoint = true;
-      }
-
-      if (topArmAtSetpoint && bottomArmAtSetpoint) {
-        armAtSetpoint = true;
-      }
+      moveArmToSetpoint();
     }
-
     if (armAtSetpoint) {
-      if (Math.abs(a_rightTrigger-a_leftTrigger) > armDeadband) {
-        bottomArm.set(a_rightTrigger-a_leftTrigger);
-      } else {
-        bottomArm.set(0);
-      }
-      if (Math.abs(a_rightStickY) > armDeadband) {
-        if (a_rightStickY > 0) {
-          topArmSetpoint = topArmSetpoint - (0.1 + 0.9*a_rightStickY*a_rightStickY)*armCoarseAdjustRate;
-        } else {
-          topArmSetpoint = topArmSetpoint + (0.1 + 0.9*a_rightStickY*a_rightStickY)*armCoarseAdjustRate;
-        }
-      } 
-      topArm.set(ControlMode.MotionMagic, encoderTicksPerRev*(topArmSetpoint - a_leftStickY*a_leftStickY*armFineAdjustRange));
+      moveArmManual();
     }
   }
 
@@ -377,6 +265,20 @@ public class Robot extends TimedRobot {
   @Override
   public void disabledPeriodic() {
     updateVariables();
+
+    // Resets all timer/encoder/arm variables to 0 before the match.
+    if (driveController.getStartButtonPressed()) {
+      leftBack.setSelectedSensorPosition(0);
+      leftFront.setSelectedSensorPosition(0);
+      rightBack.setSelectedSensorPosition(0);
+      rightFront.setSelectedSensorPosition(0);
+      topArm.setSelectedSensorPosition(0);
+      bottomArmEncoder.setPosition(0);
+      topArmSetpoint = positionTopArm;
+      bottomArmSetpoint = positionBottomArm;
+      armAtSetpoint = true;
+      updateVariables();
+    }
   }
 
   @Override
@@ -391,14 +293,59 @@ public class Robot extends TimedRobot {
   @Override
   public void simulationPeriodic() {}
 
-  public void coastMotors() {
-    topArm.setNeutralMode(NeutralMode.Coast);
-    leftBack.setNeutralMode(NeutralMode.Coast);
-    leftFront.setNeutralMode(NeutralMode.Coast);
-    rightBack.setNeutralMode(NeutralMode.Coast);
-    rightFront.setNeutralMode(NeutralMode.Coast);
-    bottomArm.setIdleMode(IdleMode.kBrake);
-    coast = true;
+  public void moveArmToSetpoint() {
+    bottomArmAtSetpoint = false;
+    topArmAtSetpoint = false;
+    
+    if (!bottomArmAtSetpoint) {
+      if (positionBottomArm < bottomArmSetpoint) {
+        bottomArm.set(1);
+      } 
+      else if (positionBottomArm > bottomArmSetpoint) {
+        bottomArm.set(-1);
+      }
+      if ((Math.abs(positionBottomArm - bottomArmSetpoint)) < bottomArmTolerance) {
+        bottomArmAtSetpoint = true;
+        bottomArm.set(0);
+      }
+    }
+
+    if (!topArmAtSetpoint) {
+      topArm.set(ControlMode.MotionMagic, topArmSetpoint*encoderTicksPerRev);
+    }
+    if ((Math.abs(positionTopArm - topArmSetpoint)) < topArmTolerance) {
+      topArmAtSetpoint = true;
+    }
+
+    if (topArmAtSetpoint && bottomArmAtSetpoint) {
+      armAtSetpoint = true;
+    }
+  }
+
+  public void moveArmManual() {
+    if (Math.abs(a_leftStickY) > armDeadband) {
+      bottomArm.set(a_leftStickY);
+    } else {
+      bottomArm.set(0);
+    }
+    if (Math.abs(a_rightStickY) > armDeadband) {
+      if (a_rightStickY > 0) {
+        topArmSetpoint = topArmSetpoint - (minJoystickTopArmResponse + (1-minJoystickTopArmResponse)*a_rightStickY*a_rightStickY)*armCoarseAdjustRate;
+      } else {
+        topArmSetpoint = topArmSetpoint + (minJoystickTopArmResponse + (1-minJoystickTopArmResponse)*a_rightStickY*a_rightStickY)*armCoarseAdjustRate;
+      }
+    } 
+    topArm.set(ControlMode.MotionMagic, encoderTicksPerRev*topArmSetpoint);
+  }
+
+  public void openClaw() {
+    solenoid.set(DoubleSolenoid.Value.kReverse);
+    solenoidToggle = true;
+  }
+
+  public void closeClaw() {
+    solenoid.set(DoubleSolenoid.Value.kForward);
+    solenoidToggle = false;
   }
 
   public void brakeMotors() {
@@ -408,16 +355,15 @@ public class Robot extends TimedRobot {
     rightBack.setNeutralMode(NeutralMode.Brake);
     rightFront.setNeutralMode(NeutralMode.Brake);
     bottomArm.setIdleMode(IdleMode.kBrake);
-    coast = false;
   }
 
   public void initializeCTREMotor(WPI_TalonFX motor) {
     motor.configFactoryDefault();
     TalonFXConfiguration config = new TalonFXConfiguration();
     config.supplyCurrLimit.enable = true;
-    config.supplyCurrLimit.triggerThresholdCurrent = 10; // max current in amps
-    config.supplyCurrLimit.triggerThresholdTime = 0; // max time exceeding max current in seconds
-    config.supplyCurrLimit.currentLimit = 10; // max current after exceeding threshold 
+    config.supplyCurrLimit.triggerThresholdCurrent = 40; // max current in amps
+    config.supplyCurrLimit.triggerThresholdTime = 0.1; // max time exceeding max current in seconds
+    config.supplyCurrLimit.currentLimit = 40; // max current after exceeding threshold 
     motor.configAllSettings(config);
     motor.setSelectedSensorPosition(0); // sets encoder to 0
   }
@@ -444,9 +390,8 @@ public class Robot extends TimedRobot {
     topArm.configAllowableClosedloopError(0, 100);
 
     bottomArm.restoreFactoryDefaults(); // resets bottomArm to default
-    bottomArm.setSmartCurrentLimit(20); // sets current limit for bottomArm in amps
+    bottomArm.setSmartCurrentLimit(8); // sets current limit for bottomArm in amps
     brakeMotors();
-    //coastMotors(); // sets all motors to coast
     bottomArm.setInverted(true);
   }
   
@@ -499,9 +444,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("a_rightStickX", a_rightStickX);
     SmartDashboard.putNumber("a_leftTrigger", a_leftTrigger);
     SmartDashboard.putNumber("a_rightTrigger", a_rightTrigger);
-    SmartDashboard.putBoolean("Compressor", compressorToggle);
     SmartDashboard.putBoolean("Solenoid", solenoidToggle);
-    SmartDashboard.putBoolean("Coast", coast);
     SmartDashboard.putBoolean("At Setpoint", armAtSetpoint);
     SmartDashboard.putBoolean("Top At Setpoint", topArmAtSetpoint);
     SmartDashboard.putBoolean("Bottom At Setpoint", bottomArmAtSetpoint);
