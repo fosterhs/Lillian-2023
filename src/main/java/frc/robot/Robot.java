@@ -55,10 +55,11 @@ public class Robot extends TimedRobot {
   boolean armAtSetpoint = true;
   boolean bottomArmAtSetpoint = true;
   boolean topArmAtSetpoint = true;
-  double minJoystickTopArmResponse = 0.2;
+  double minJoystickTopArmResponse = 0.15;
+  double maxTopArmOutput = 0.25;
   
   // Drive Variables
-  double minJoystickDriveResponse = 0.25;
+  double minJoystickDriveResponse = 0.24;
 
   // Controller Variables
   double d_leftStickY;
@@ -200,13 +201,6 @@ public class Robot extends TimedRobot {
     }
     
     // Arm actuation code
-
-    // Neutral/Starting Position
-    if (armController.getStartButtonPressed()) {
-      bottomArmSetpoint = 0;
-      topArmSetpoint = 0;
-      armAtSetpoint = false;
-    }
     // Drive/Carry
     if (armController.getAButtonPressed()) {
       bottomArmSetpoint = 0;
@@ -231,12 +225,6 @@ public class Robot extends TimedRobot {
       topArmSetpoint = 0.141;
       armAtSetpoint = false;
     }
-    // Cone Scoring (Middle)
-    if (armController.getBackButtonPressed()) {
-      bottomArmSetpoint = 0.15;
-      topArmSetpoint = 0;
-      armAtSetpoint = false;
-    }
     // Cube Scoring (Top)
     if (a_leftTrigger > 0.25) {
       bottomArmSetpoint = 0;
@@ -246,6 +234,18 @@ public class Robot extends TimedRobot {
     // Cone Scoring (Top)
     if (a_rightTrigger > 0.25) {
       bottomArmSetpoint = 0.119;
+      topArmSetpoint = 0;
+      armAtSetpoint = false;
+    }
+    // Neutral/Starting Position
+    if (armController.getStartButtonPressed()) {
+      bottomArmSetpoint = 0;
+      topArmSetpoint = 0;
+      armAtSetpoint = false;
+    }
+    // Cone Scoring (Middle)
+    if (armController.getBackButtonPressed()) {
+      bottomArmSetpoint = 0.15;
       topArmSetpoint = 0;
       armAtSetpoint = false;
     }
@@ -279,6 +279,9 @@ public class Robot extends TimedRobot {
       topArmSetpoint = positionTopArm;
       bottomArmSetpoint = positionBottomArm;
       armAtSetpoint = true;
+      pidSpeed.reset();
+      autoStage = 1;
+      settleInterations = 0;
       timer.reset();
       updateVariables();
     }
@@ -351,15 +354,6 @@ public class Robot extends TimedRobot {
     solenoidToggle = false;
   }
 
-  public void brakeMotors() {
-    topArm.setNeutralMode(NeutralMode.Brake);
-    leftBack.setNeutralMode(NeutralMode.Brake);
-    leftFront.setNeutralMode(NeutralMode.Brake);
-    rightBack.setNeutralMode(NeutralMode.Brake);
-    rightFront.setNeutralMode(NeutralMode.Brake);
-    bottomArm.setIdleMode(IdleMode.kBrake);
-  }
-
   public void initializeCTREMotor(WPI_TalonFX motor) {
     motor.configFactoryDefault();
     TalonFXConfiguration config = new TalonFXConfiguration();
@@ -369,6 +363,7 @@ public class Robot extends TimedRobot {
     config.supplyCurrLimit.currentLimit = 40; // max current after exceeding threshold 
     motor.configAllSettings(config);
     motor.setSelectedSensorPosition(0); // sets encoder to 0
+    motor.setNeutralMode(NeutralMode.Brake);
   }
 
   public void initializeMotors() {
@@ -391,11 +386,14 @@ public class Robot extends TimedRobot {
     topArm.configMaxIntegralAccumulator(0, 0.2);
     topArm.config_IntegralZone(0, 20000);
     topArm.configAllowableClosedloopError(0, 100);
+    topArm.configClosedLoopPeakOutput(0, maxTopArmOutput);
+    topArm.configPeakOutputForward(-maxTopArmOutput);
+    topArm.configPeakOutputReverse(-maxTopArmOutput);
 
     bottomArm.restoreFactoryDefaults(); // resets bottomArm to default
     bottomArm.setSmartCurrentLimit(8); // sets current limit for bottomArm in amps
-    brakeMotors();
     bottomArm.setInverted(true);
+    bottomArm.setIdleMode(IdleMode.kBrake);
   }
   
   // updates all program variables. should be called at the begining of every loop.
