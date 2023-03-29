@@ -3,6 +3,7 @@ package frc.robot;
 import edu.wpi.first.math.controller.PIDController;
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.RelativeEncoder;
+import com.revrobotics.SparkMaxAbsoluteEncoder;
 import com.revrobotics.SparkMaxRelativeEncoder;
 import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
@@ -35,7 +36,8 @@ public class Robot extends TimedRobot {
   DifferentialDrive drive = new DifferentialDrive(motorGroupLeft, motorGroupRight);
   XboxController driveController = new XboxController(0);
   XboxController armController = new XboxController(1);
-  RelativeEncoder bottomArmEncoder = bottomArm.getEncoder(SparkMaxRelativeEncoder.Type.kQuadrature, 2048); //bottom arm encoder
+  //RelativeEncoder bottomArmEncoder = bottomArm.getEncoder(SparkMaxRelativeEncoder.Type.kQuadrature, 2048); //bottom arm encoder
+  SparkMaxAbsoluteEncoder bottomArmEncoder = bottomArm.getAbsoluteEncoder(SparkMaxAbsoluteEncoder.Type.kDutyCycle);
   AHRS gyro = new AHRS(); // NavX2 gyro
   Timer timer = new Timer(); 
   double encoderTicksPerMeter = 2048*10.71/(0.0254*6*Math.PI); // theoretical 45812 ticks per meter traveled
@@ -281,7 +283,7 @@ public class Robot extends TimedRobot {
       rightBack.setSelectedSensorPosition(0);
       rightFront.setSelectedSensorPosition(0);
       topArm.setSelectedSensorPosition(0);
-      bottomArmEncoder.setPosition(0);
+      //bottomArmEncoder.setPosition(0);
       topArmSetpoint = positionTopArm;
       bottomArmSetpoint = positionBottomArm;
       armAtSetpoint = true;
@@ -333,8 +335,8 @@ public class Robot extends TimedRobot {
   }
 
   public void moveArmManual() {
-    if (Math.abs(a_leftStickY) > armDeadband && (positionBottomArm > 0 || a_leftStickY > 0)) {
-      bottomArm.set(a_leftStickY);
+    if (Math.abs(a_leftStickY) > armDeadband && (positionBottomArm > 0 || a_leftStickY < 0)) {
+      bottomArm.set(-a_leftStickY);
     } else {
       bottomArm.set(0);
     }
@@ -405,15 +407,15 @@ public class Robot extends TimedRobot {
     bottomArm.setSmartCurrentLimit(8); // sets current limit for bottomArm in amps
     bottomArm.setInverted(true);
     bottomArm.setIdleMode(IdleMode.kBrake);
+    bottomArmEncoder.setZeroOffset(0.224);
   }
   
   // updates all program variables. should be called at the begining of every loop.
   public void updateVariables() {
-    positionBottomArm = bottomArmEncoder.getPosition()/2; // 0-1 represents 1 full revolution of the bottom arm. Starts at 0.
-    if (positionBottomArm > 140) { // Resolves encoder negative overrun issue
-      positionBottomArm = positionBottomArm - 274.6583251953125;
+    positionBottomArm = bottomArmEncoder.getPosition(); // 0-1 represents 1 full revolution of the bottom arm. Starts at 0.
+    if (positionBottomArm > 0.5) {
+      positionBottomArm = positionBottomArm - 1;
     }
-    //positionBottomArm = bottomArmEncoderAbs.getPosition();
     positionTopArm = topArm.getSelectedSensorPosition()/encoderTicksPerRev; // 0-1 represents 1 full revolution of the top arm. Starts at 0.
     positionLeftBack = leftBack.getSelectedSensorPosition()/encoderTicksPerMeter; // wheel distance in meters. Starts at 0.
     positionLeftFront = leftFront.getSelectedSensorPosition()/encoderTicksPerMeter; // wheel distance in meters. Starts at 0. 
