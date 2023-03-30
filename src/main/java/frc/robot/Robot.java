@@ -2,9 +2,7 @@ package frc.robot;
 
 import edu.wpi.first.math.controller.PIDController;
 import com.revrobotics.CANSparkMax;
-import com.revrobotics.RelativeEncoder;
 import com.revrobotics.SparkMaxAbsoluteEncoder;
-import com.revrobotics.SparkMaxRelativeEncoder;
 import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import edu.wpi.first.wpilibj.TimedRobot;
@@ -97,7 +95,7 @@ public class Robot extends TimedRobot {
 
   // Auto Variables
   int autoStage = 1;
-  PIDController pidSpeed = new PIDController(1, 0.2, 0.2);
+  PIDController pidSpeed = new PIDController(1, 0.2, 0.15);
   int settleInterations = 0;
 
   @Override
@@ -119,8 +117,8 @@ public class Robot extends TimedRobot {
     compressor.enableDigital();
     
     // Auto Arm First Setpoint
-    bottomArmSetpoint = 0;
-    topArmSetpoint = -0.068;
+    bottomArmSetpoint = 0.245;
+    topArmSetpoint = 0.043;
     armAtSetpoint = false;
   }
 
@@ -145,9 +143,9 @@ public class Robot extends TimedRobot {
       }
     } else if (autoStage == 3) { // Moves forward by a set distance using PID control
       double averagePosition = (positionLeftBack + positionLeftFront + positionRightBack + positionRightFront)/4;
-      double translation = pidSpeed.calculate(averagePosition, 3.2);
+      double translation = pidSpeed.calculate(averagePosition, -3.2);
       drive.arcadeDrive(translation, 0);
-      if (averagePosition > 3.2) {
+      if (averagePosition < -3.2) {
         autoStage++;
         // Auto Arm Second Setpoint
         bottomArmSetpoint = 0.057;
@@ -210,6 +208,11 @@ public class Robot extends TimedRobot {
     }
     
     // Arm actuation code
+
+    if (armController.getPOV() != -1) {
+      topArmSetpoint = positionTopArm;
+      armAtSetpoint = true;
+    }
     // Drive/Carry
     if (armController.getAButtonPressed()) {
       bottomArmSetpoint = 0;
@@ -224,26 +227,26 @@ public class Robot extends TimedRobot {
     } 
     // Double Substation Pickup
     if (armController.getXButtonPressed()) {
-      bottomArmSetpoint = 0.064;
-      topArmSetpoint = -0.092;
+      bottomArmSetpoint = 0.095;
+      topArmSetpoint = -0.073;
       armAtSetpoint = false;
     }
     // Cube Scoring (Middle)
     if (armController.getYButtonPressed()) {
-      bottomArmSetpoint = 0;
-      topArmSetpoint = 0;
+      bottomArmSetpoint = 0.136;
+      topArmSetpoint = -0.111;
       armAtSetpoint = false;
     }
     // Cube Scoring (Top)
     if (a_leftTrigger > 0.25) {
-      bottomArmSetpoint = 0;
-      topArmSetpoint = 0;
+      bottomArmSetpoint = 0.245;
+      topArmSetpoint = 0.043;
       armAtSetpoint = false;
     }
     // Cone Scoring (Top)
     if (a_rightTrigger > 0.25) {
-      bottomArmSetpoint = 0;
-      topArmSetpoint = 0;
+      bottomArmSetpoint = 0.256;
+      topArmSetpoint = 0.110;
       armAtSetpoint = false;
     }
     // Neutral/Starting Position
@@ -254,8 +257,8 @@ public class Robot extends TimedRobot {
     }
     // Cone Scoring (Middle)
     if (armController.getBackButtonPressed()) {
-      bottomArmSetpoint = 0;
-      topArmSetpoint = 0;
+      bottomArmSetpoint = 0.158;
+      topArmSetpoint = -0.040;
       armAtSetpoint = false;
     }
 
@@ -335,7 +338,7 @@ public class Robot extends TimedRobot {
   }
 
   public void moveArmManual() {
-    if (Math.abs(a_leftStickY) > armDeadband && (positionBottomArm > 0 || a_leftStickY < 0)) {
+    if (Math.abs(a_leftStickY) > armDeadband && (positionBottomArm > 0.05 || a_leftStickY < 0)) {
       bottomArm.set(-a_leftStickY);
     } else {
       bottomArm.set(0);
