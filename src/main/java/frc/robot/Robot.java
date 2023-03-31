@@ -1,26 +1,28 @@
 package frc.robot;
 
-import edu.wpi.first.math.controller.PIDController;
-import com.revrobotics.CANSparkMax;
-import com.revrobotics.SparkMaxAbsoluteEncoder;
-import com.revrobotics.CANSparkMax.IdleMode;
-import com.revrobotics.CANSparkMaxLowLevel.MotorType;
-import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj.Compressor;
-import edu.wpi.first.wpilibj.PneumaticsModuleType;
-import edu.wpi.first.wpilibj.PowerDistribution;
-import edu.wpi.first.wpilibj.DoubleSolenoid;
-import edu.wpi.first.wpilibj.XboxController;
-import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
-import edu.wpi.first.wpilibj.drive.DifferentialDrive;
-import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.can.TalonFXConfiguration;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
 import com.kauailabs.navx.frc.AHRS;
+import com.revrobotics.CANSparkMax;
+import com.revrobotics.CANSparkMax.IdleMode;
+import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+import com.revrobotics.SparkMaxAbsoluteEncoder;
+
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.wpilibj.Compressor;
+import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.DoubleSolenoid;
+import edu.wpi.first.wpilibj.PneumaticsModuleType;
+import edu.wpi.first.wpilibj.PowerDistribution;
+import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
+import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class Robot extends TimedRobot {
   WPI_TalonFX rightFront = new WPI_TalonFX(4); // front right drive motor
@@ -97,6 +99,12 @@ public class Robot extends TimedRobot {
   int autoStage = 1;
   PIDController pidSpeed = new PIDController(1, 0.2, 0.15);
   int settleInterations = 0;
+
+  // Digital Inputs
+  DigitalInput input0 = new DigitalInput(0);
+  DigitalInput input1 = new DigitalInput(1);
+
+  double autoClawOpenStageTime;
 
   @Override
   public void robotInit() {
@@ -179,6 +187,16 @@ public class Robot extends TimedRobot {
   public void teleopPeriodic() {
     updateVariables();
 
+    // Proximity Sensor Code
+    if ((!input0.get() || !input1.get()) && (a_leftTrigger > 0.25)) {
+      closeClaw();
+    } else if ((input0.get() || input1.get()) && (a_leftTrigger > 0.25)) {
+      autoClawOpenStageTime = timer.get();
+        if((timer.get() - autoClawOpenStageTime) > 1.0) {
+          openClaw();
+        }
+    }
+
     // Drive Code: leftStickY controls speed, rightStickX controls rotation.
     double translation = 0;
     if (Math.abs(d_leftStickY) > 0.04) {
@@ -238,11 +256,13 @@ public class Robot extends TimedRobot {
       armAtSetpoint = false;
     }
     // Cube Scoring (Top)
-    if (a_leftTrigger > 0.25) {
+    
+    /* if (a_leftTrigger > 0.25) {
       bottomArmSetpoint = 0.245;
       topArmSetpoint = 0.043;
       armAtSetpoint = false;
-    }
+    } */
+
     // Cone Scoring (Top)
     if (a_rightTrigger > 0.25) {
       bottomArmSetpoint = 0.256;
@@ -374,9 +394,9 @@ public class Robot extends TimedRobot {
     motor.configFactoryDefault();
     TalonFXConfiguration config = new TalonFXConfiguration();
     config.supplyCurrLimit.enable = true;
-    config.supplyCurrLimit.triggerThresholdCurrent = 40; // max current in amps
+    config.supplyCurrLimit.triggerThresholdCurrent = 10; // max current in amps (40 was original)
     config.supplyCurrLimit.triggerThresholdTime = 0.1; // max time exceeding max current in seconds
-    config.supplyCurrLimit.currentLimit = 40; // max current after exceeding threshold 
+    config.supplyCurrLimit.currentLimit = 10; // max current after exceeding threshold 
     motor.configAllSettings(config);
     motor.setSelectedSensorPosition(0); // sets encoder to 0
     motor.setNeutralMode(NeutralMode.Brake);
@@ -441,6 +461,9 @@ public class Robot extends TimedRobot {
     a_rightTrigger = armController.getRightTriggerAxis();
     totalCurrent = pdp.getTotalCurrent();
     topArmCurrent = pdp.getCurrent(12);
+
+    input0.get();
+    input1.get();
 
     SmartDashboard.putNumber("Total I", totalCurrent);
     SmartDashboard.putNumber("Arm I", topArmCurrent);
