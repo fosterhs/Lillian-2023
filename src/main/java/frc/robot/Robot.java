@@ -64,6 +64,10 @@ public class Robot extends TimedRobot {
   boolean topArmAtSetpoint = true;
   double minJoystickTopArmResponse = 0.1;
   double maxTopArmOutput = 1;
+  double bottomArmAngle;
+  double topArmAngle;
+  double clawX;
+  double clawZ;
   
   // Drive Variables
   double minJoystickDriveResponse = 0.24;
@@ -461,10 +465,15 @@ public class Robot extends TimedRobot {
     a_rightTrigger = armController.getRightTriggerAxis();
     totalCurrent = pdp.getTotalCurrent();
     topArmCurrent = pdp.getCurrent(12);
+    bottomArmAngle = positionBottomArm*360+10;
+    topArmAngle = 90 - bottomArmAngle + 10 + positionTopArm*360;
+    clawX = -0.72*Math.cos(bottomArmAngle*Math.PI/180) + 0.92*Math.cos(topArmAngle*Math.PI/180);
+    clawZ = 0.72*Math.sin(bottomArmAngle*Math.PI/180) + 0.92*Math.sin(topArmAngle*Math.PI/180);
 
-    input0.get();
-    input1.get();
-
+    SmartDashboard.putNumber("Bottom Arm Angle", bottomArmAngle);
+    SmartDashboard.putNumber("Top Arm Angle", topArmAngle);
+    SmartDashboard.putNumber("Claw X", clawX);
+    SmartDashboard.putNumber("Claw Y", clawZ);
     SmartDashboard.putNumber("Total I", totalCurrent);
     SmartDashboard.putNumber("Arm I", topArmCurrent);
     SmartDashboard.putNumber("Bottom Arm Position", positionBottomArm);
