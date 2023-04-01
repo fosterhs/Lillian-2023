@@ -36,7 +36,6 @@ public class Robot extends TimedRobot {
   DifferentialDrive drive = new DifferentialDrive(motorGroupLeft, motorGroupRight);
   XboxController driveController = new XboxController(0);
   XboxController armController = new XboxController(1);
-  //RelativeEncoder bottomArmEncoder = bottomArm.getEncoder(SparkMaxRelativeEncoder.Type.kQuadrature, 2048); //bottom arm encoder
   SparkMaxAbsoluteEncoder bottomArmEncoder = bottomArm.getAbsoluteEncoder(SparkMaxAbsoluteEncoder.Type.kDutyCycle);
   AHRS gyro = new AHRS(); // NavX2 gyro
   Timer timer = new Timer(); 
@@ -68,6 +67,10 @@ public class Robot extends TimedRobot {
   double topArmAngle;
   double clawX;
   double clawZ;
+  boolean proximitySensorStatus;
+  double clawOpenTime;
+  boolean clawAutoClosed = false;
+  double clawAutoCloseTime;
   
   // Drive Variables
   double minJoystickDriveResponse = 0.24;
@@ -107,6 +110,8 @@ public class Robot extends TimedRobot {
   // Digital Inputs
   DigitalInput input0 = new DigitalInput(0);
   DigitalInput input1 = new DigitalInput(1);
+  boolean sensor0;
+  boolean sensor1;
 
   double autoClawOpenStageTime;
 
@@ -137,7 +142,7 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     updateVariables();
-    if (autoStage == 1) { // Moves the arm to the 1st auto setpoint
+    if (autoStage == 1) { // Moves the arm to the 1st auto setpoint and closes claw
       closeClaw();
       drive.arcadeDrive(0, 0);
       if (!armAtSetpoint) {
@@ -147,39 +152,64 @@ public class Robot extends TimedRobot {
         autoStage++;
         stage2StartTime = timer.get();
       }  
-    } else if (autoStage == 2) { // Delays 2 seconds, then opens the claw
+    } else if (autoStage == 2) { // Delays 1 seconds, then opens the claw
       drive.arcadeDrive(0, 0);
-      if ((timer.get() - stage2StartTime) > 2.0) {
+      if ((timer.get() - stage2StartTime) > 1.0) {
         openClaw();
+
+        // Rear Floor Pickup
+        bottomArmSetpoint = 0.165;
+        topArmSetpoint = 0.539;
+        armAtSetpoint = false;
+
+        clawOpenTime = timer.get();
         autoStage++;
       }
-    } else if (autoStage == 3) { // Moves forward by a set distance using PID control
+    } else if (autoStage == 3) { // Moves backward for 3.5 meters and closes claw when detected game piece
       double averagePosition = (positionLeftBack + positionLeftFront + positionRightBack + positionRightFront)/4;
-      double translation = pidSpeed.calculate(averagePosition, -3.2);
-      drive.arcadeDrive(translation, 0);
-      if (averagePosition < -3.2) {
-        autoStage++;
-        // Auto Arm Second Setpoint
+      if (armAtSetpoint && (proximitySensorStatus || averagePosition < -3.5)) {
+        drive.arcadeDrive(0, 0);
+        // 3rd Auto Position (Floor Scoring)
         bottomArmSetpoint = 0.057;
         topArmSetpoint = -0.255;
         armAtSetpoint = false;
-      }
-    } else if (autoStage == 4) { // Moves the arm to the 2nd Auto Setpoint
-      drive.arcadeDrive(0, 0);
-      if (!armAtSetpoint) {
-        moveArmToSetpoint();
-      }
-      if (armAtSetpoint) {
         autoStage++;
+        if (proximitySensorStatus) {
+          closeClaw();
+        }
+      } else {
+        if (averagePosition > -3.5) {
+          drive.arcadeDrive(-0.35, 0);
+        } else {
+          drive.arcadeDrive(0, 0);
+        }
+        if (!armAtSetpoint) {
+          moveArmToSetpoint();
+        }
       }
+    } else if (autoStage == 4) { // 
+      double averagePosition = (positionLeftBack + positionLeftFront + positionRightBack + positionRightFront)/4;
+      if (armAtSetpoint && averagePosition > 0) {
+        drive.arcadeDrive(0, 0);
+        autoStage++;
+      } else {
+        if (averagePosition < 0) {
+          drive.arcadeDrive(0.35, 0);
+        } else {
+          drive.arcadeDrive(0, 0);
+        }
+        if (!armAtSetpoint) {
+          moveArmToSetpoint();
+        }
+     }
     } else if (autoStage == 5) {
-      drive.arcadeDrive(0, 0);
-      closeClaw();
+      openClaw();
       autoStage++;
-    } else {
+    } else { 
       drive.arcadeDrive(0, 0);
-    }
+    } 
   }
+  // Scoring position, move back [Stage 4], open claw [Stage 5]
 
   @Override
   public void teleopInit() {
@@ -192,13 +222,14 @@ public class Robot extends TimedRobot {
     updateVariables();
 
     // Proximity Sensor Code
-    if ((!input0.get() || !input1.get()) && (a_leftTrigger > 0.25)) {
+    if (!clawAutoClosed && proximitySensorStatus && (a_leftTrigger > 0.25)) {
       closeClaw();
-    } else if ((input0.get() || input1.get()) && (a_leftTrigger > 0.25)) {
-      autoClawOpenStageTime = timer.get();
-        if((timer.get() - autoClawOpenStageTime) > 1.0) {
-          openClaw();
-        }
+      clawAutoClosed = true;
+      clawAutoCloseTime = time;
+    } 
+    if (!proximitySensorStatus && (a_leftTrigger > 0.25) && ((time - clawAutoCloseTime) > 1.0)) {
+      openClaw();
+      clawAutoClosed = false;
     }
 
     // Drive Code: leftStickY controls speed, rightStickX controls rotation.
@@ -227,11 +258,12 @@ public class Robot extends TimedRobot {
     // Right bumper: open the claw
     if (armController.getRightBumperPressed()) {
       openClaw();
+      clawAutoClosed = false;
     }
     
     // Arm actuation code
-
-    if (armController.getPOV() != -1) {
+    // Hands back user control to arm operator after setpoint malfunction
+    if (armController.getPOV() == 360) {
       topArmSetpoint = positionTopArm;
       armAtSetpoint = true;
     }
@@ -260,13 +292,11 @@ public class Robot extends TimedRobot {
       armAtSetpoint = false;
     }
     // Cube Scoring (Top)
-    
-    /* if (a_leftTrigger > 0.25) {
+    if (armController.getPOV() == 0) {
       bottomArmSetpoint = 0.245;
       topArmSetpoint = 0.043;
       armAtSetpoint = false;
-    } */
-
+    } 
     // Cone Scoring (Top)
     if (a_rightTrigger > 0.25) {
       bottomArmSetpoint = 0.256;
@@ -275,7 +305,7 @@ public class Robot extends TimedRobot {
     }
     // Neutral/Starting Position
     if (armController.getStartButtonPressed()) {
-      bottomArmSetpoint = 0;
+      bottomArmSetpoint = 0.01;
       topArmSetpoint = 0;
       armAtSetpoint = false;
     }
@@ -310,7 +340,6 @@ public class Robot extends TimedRobot {
       rightBack.setSelectedSensorPosition(0);
       rightFront.setSelectedSensorPosition(0);
       topArm.setSelectedSensorPosition(0);
-      //bottomArmEncoder.setPosition(0);
       topArmSetpoint = positionTopArm;
       bottomArmSetpoint = positionBottomArm;
       armAtSetpoint = true;
@@ -443,6 +472,13 @@ public class Robot extends TimedRobot {
     if (positionBottomArm > 0.5) {
       positionBottomArm = positionBottomArm - 1;
     }
+    sensor0 = input0.get();
+    sensor1 = input1.get();
+    if (!sensor0 || !sensor1) {
+      proximitySensorStatus = true;
+    } else {
+      proximitySensorStatus = false;
+    }
     positionTopArm = topArm.getSelectedSensorPosition()/encoderTicksPerRev; // 0-1 represents 1 full revolution of the top arm. Starts at 0.
     positionLeftBack = leftBack.getSelectedSensorPosition()/encoderTicksPerMeter; // wheel distance in meters. Starts at 0.
     positionLeftFront = leftFront.getSelectedSensorPosition()/encoderTicksPerMeter; // wheel distance in meters. Starts at 0. 
@@ -470,6 +506,7 @@ public class Robot extends TimedRobot {
     clawX = -0.72*Math.cos(bottomArmAngle*Math.PI/180) + 0.92*Math.cos(topArmAngle*Math.PI/180);
     clawZ = 0.72*Math.sin(bottomArmAngle*Math.PI/180) + 0.92*Math.sin(topArmAngle*Math.PI/180);
 
+    SmartDashboard.putBoolean("Sensor", proximitySensorStatus);
     SmartDashboard.putNumber("Bottom Arm Angle", bottomArmAngle);
     SmartDashboard.putNumber("Top Arm Angle", topArmAngle);
     SmartDashboard.putNumber("Claw X", clawX);
@@ -504,5 +541,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Angle", angle);
     SmartDashboard.putNumber("Stage", autoStage);
     SmartDashboard.putNumber("Top Arm Setpoint", topArmSetpoint);
+    SmartDashboard.putBoolean("Proximity Sensor 0", sensor0);
+    SmartDashboard.putBoolean("Proximity Sensor 1", sensor1);
   }
 }
