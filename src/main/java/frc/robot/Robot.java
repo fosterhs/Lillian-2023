@@ -16,7 +16,6 @@ import com.revrobotics.SparkMaxAbsoluteEncoder;
 
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.RamseteController;
-import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
@@ -130,6 +129,8 @@ public class Robot extends TimedRobot {
   PathPlannerTrajectory path = PathPlanner.loadPath("Test Path", new PathConstraints(0.8, 0.4));
   RamseteController ramsete = new RamseteController(2, 0.7);
   DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(0.55);
+  double robotX = 0;
+  double robotY = 0;
 
   @Override
   public void robotInit() {
@@ -148,21 +149,18 @@ public class Robot extends TimedRobot {
   public void autonomousInit() {
     timer.reset();
     compressor.enableDigital();
-    
-    // Auto Arm First Setpoint
-    bottomArmSetpoint = 0.245;
-    topArmSetpoint = 0.043;
-    armAtSetpoint = false;
   }
 
   @Override
   public void autonomousPeriodic() {
     updateVariables();
+
+    // Trajectory following
     PathPlannerState currentGoal = (PathPlannerState) path.sample(timer.get());
     ChassisSpeeds chassisSpeeds = ramsete.calculate(odometry.getPoseMeters(), currentGoal);
     DifferentialDriveWheelSpeeds wheelSpeeds = kinematics.toWheelSpeeds(chassisSpeeds);
     double leftSpeed = wheelSpeeds.leftMetersPerSecond/10*encoderTicksPerMeter;
-    double rightSpeed = wheelSpeeds.rightMetersPerSecond/10*(encoderTicksPerMeter);
+    double rightSpeed = wheelSpeeds.rightMetersPerSecond/10*encoderTicksPerMeter;
     leftBack.set(ControlMode.Velocity, leftSpeed);
     leftFront.set(ControlMode.Velocity, leftSpeed);
     rightBack.set(ControlMode.Velocity, rightSpeed);
@@ -473,7 +471,11 @@ public class Robot extends TimedRobot {
     clawZ = 0.72*Math.sin(bottomArmAngle*Math.PI/180) + 0.92*Math.sin(topArmAngle*Math.PI/180);
 
     odometry.update(Rotation2d.fromDegrees(-yaw), (positionLeftBack+positionLeftFront)/2, (positionRightBack+positionRightFront)/2);
+    robotX = odometry.getPoseMeters().getX();
+    robotY = odometry.getPoseMeters().getY();
 
+    SmartDashboard.putNumber("robotX", robotX);
+    SmartDashboard.putNumber("robotY", robotY);
     SmartDashboard.putBoolean("Sensor", proximitySensorStatus);
     SmartDashboard.putNumber("Bottom Arm Angle", bottomArmAngle);
     SmartDashboard.putNumber("Top Arm Angle", topArmAngle);
