@@ -5,12 +5,23 @@ import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.can.TalonFXConfiguration;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
 import com.kauailabs.navx.frc.AHRS;
+import com.pathplanner.lib.PathConstraints;
+import com.pathplanner.lib.PathPlanner;
+import com.pathplanner.lib.PathPlannerTrajectory;
+import com.pathplanner.lib.PathPlannerTrajectory.PathPlannerState;
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import com.revrobotics.SparkMaxAbsoluteEncoder;
 
 import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.RamseteController;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
+import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
 import edu.wpi.first.wpilibj.Compressor;
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
@@ -115,6 +126,11 @@ public class Robot extends TimedRobot {
 
   double autoClawOpenStageTime;
 
+  DifferentialDriveOdometry odometry = new DifferentialDriveOdometry(new Rotation2d(0), 0, 0);
+  PathPlannerTrajectory path = PathPlanner.loadPath("Test Path", new PathConstraints(0.8, 0.4));
+  RamseteController ramsete = new RamseteController(2, 0.7);
+  DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(0.55);
+
   @Override
   public void robotInit() {
     initializeMotors();
@@ -142,74 +158,17 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousPeriodic() {
     updateVariables();
-    if (autoStage == 1) { // Moves the arm to the 1st auto setpoint and closes claw
-      closeClaw();
-      drive.arcadeDrive(0, 0);
-      if (!armAtSetpoint) {
-        moveArmToSetpoint();
-      }
-      if (armAtSetpoint) {
-        autoStage++;
-        stage2StartTime = timer.get();
-      }  
-    } else if (autoStage == 2) { // Delays 1 seconds, then opens the claw
-      drive.arcadeDrive(0, 0);
-      if ((timer.get() - stage2StartTime) > 1.0) {
-        openClaw();
-
-        // Rear Floor Pickup
-        bottomArmSetpoint = 0.165;
-        topArmSetpoint = 0.539;
-        armAtSetpoint = false;
-
-        clawOpenTime = timer.get();
-        autoStage++;
-      }
-    } else if (autoStage == 3) { // Moves backward for 3.5 meters and closes claw when detected game piece
-      double averagePosition = (positionLeftBack + positionLeftFront + positionRightBack + positionRightFront)/4;
-      if (armAtSetpoint && (proximitySensorStatus || averagePosition < -3.5)) {
-        drive.arcadeDrive(0, 0);
-        // 3rd Auto Position (Floor Scoring)
-        bottomArmSetpoint = 0.057;
-        topArmSetpoint = -0.255;
-        armAtSetpoint = false;
-        autoStage++;
-        if (proximitySensorStatus) {
-          closeClaw();
-        }
-      } else {
-        if (averagePosition > -3.5) {
-          drive.arcadeDrive(-0.35, 0);
-        } else {
-          drive.arcadeDrive(0, 0);
-        }
-        if (!armAtSetpoint) {
-          moveArmToSetpoint();
-        }
-      }
-    } else if (autoStage == 4) { // 
-      double averagePosition = (positionLeftBack + positionLeftFront + positionRightBack + positionRightFront)/4;
-      if (armAtSetpoint && averagePosition > 0) {
-        drive.arcadeDrive(0, 0);
-        autoStage++;
-      } else {
-        if (averagePosition < 0) {
-          drive.arcadeDrive(0.35, 0);
-        } else {
-          drive.arcadeDrive(0, 0);
-        }
-        if (!armAtSetpoint) {
-          moveArmToSetpoint();
-        }
-     }
-    } else if (autoStage == 5) {
-      openClaw();
-      autoStage++;
-    } else { 
-      drive.arcadeDrive(0, 0);
-    } 
+    PathPlannerState currentGoal = (PathPlannerState) path.sample(timer.get());
+    ChassisSpeeds chassisSpeeds = ramsete.calculate(odometry.getPoseMeters(), currentGoal);
+    DifferentialDriveWheelSpeeds wheelSpeeds = kinematics.toWheelSpeeds(chassisSpeeds);
+    double leftSpeed = wheelSpeeds.leftMetersPerSecond/10*encoderTicksPerMeter;
+    double rightSpeed = wheelSpeeds.rightMetersPerSecond/10*(encoderTicksPerMeter);
+    leftBack.set(ControlMode.Velocity, leftSpeed);
+    leftFront.set(ControlMode.Velocity, leftSpeed);
+    rightBack.set(ControlMode.Velocity, rightSpeed);
+    rightFront.set(ControlMode.Velocity, rightSpeed);
+    drive.feed();
   }
-  // Scoring position, move back [Stage 4], open claw [Stage 5]
 
   @Override
   public void teleopInit() {
@@ -433,6 +392,13 @@ public class Robot extends TimedRobot {
     motor.configAllSettings(config);
     motor.setSelectedSensorPosition(0); // sets encoder to 0
     motor.setNeutralMode(NeutralMode.Brake);
+
+    double kI_drive = 0.0003;
+    motor.config_kP(0, 0.04);
+    motor.config_kI(0, kI_drive);
+    motor.config_kD(0, 1);
+    motor.config_kF(0, 0.0447);
+    motor.configMaxIntegralAccumulator(0, 0.8*1023/kI_drive);
   }
 
   public void initializeMotors() {
@@ -505,6 +471,8 @@ public class Robot extends TimedRobot {
     topArmAngle = 90 - bottomArmAngle + 10 + positionTopArm*360;
     clawX = -0.72*Math.cos(bottomArmAngle*Math.PI/180) + 0.92*Math.cos(topArmAngle*Math.PI/180);
     clawZ = 0.72*Math.sin(bottomArmAngle*Math.PI/180) + 0.92*Math.sin(topArmAngle*Math.PI/180);
+
+    odometry.update(Rotation2d.fromDegrees(-yaw), (positionLeftBack+positionLeftFront)/2, (positionRightBack+positionRightFront)/2);
 
     SmartDashboard.putBoolean("Sensor", proximitySensorStatus);
     SmartDashboard.putNumber("Bottom Arm Angle", bottomArmAngle);
