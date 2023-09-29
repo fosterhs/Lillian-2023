@@ -13,9 +13,10 @@ import com.revrobotics.CANSparkMax;
 import com.revrobotics.CANSparkMax.IdleMode;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import com.revrobotics.SparkMaxAbsoluteEncoder;
-
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.RamseteController;
+import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
@@ -24,6 +25,7 @@ import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
 import edu.wpi.first.wpilibj.Compressor;
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
+import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.PneumaticsModuleType;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
@@ -39,26 +41,37 @@ public class Robot extends TimedRobot {
   WPI_TalonFX rightBack = new WPI_TalonFX(3); // back right drive motor
   WPI_TalonFX leftFront = new WPI_TalonFX(2); // front left drive motor
   WPI_TalonFX leftBack = new WPI_TalonFX(1); // back left drive motor
-  WPI_TalonFX topArm = new WPI_TalonFX(0); // top arm motor
-  CANSparkMax bottomArm = new CANSparkMax(1, MotorType.kBrushed); // bottom arm motor
   MotorControllerGroup motorGroupLeft = new MotorControllerGroup(leftFront, leftBack);
   MotorControllerGroup motorGroupRight = new MotorControllerGroup(rightFront, rightBack);
   DifferentialDrive drive = new DifferentialDrive(motorGroupLeft, motorGroupRight);
-  XboxController driveController = new XboxController(0);
-  XboxController armController = new XboxController(1);
-  SparkMaxAbsoluteEncoder bottomArmEncoder = bottomArm.getAbsoluteEncoder(SparkMaxAbsoluteEncoder.Type.kDutyCycle);
+  SlewRateLimiter xAccLimiter = new SlewRateLimiter(3);
+  SlewRateLimiter angAccLimiter = new SlewRateLimiter(3);
+
+  DifferentialDriveOdometry odometry = new DifferentialDriveOdometry(new Rotation2d(0), 0, 0);
+  PathPlannerTrajectory path = PathPlanner.loadPath("Test Path", new PathConstraints(0.8, 0.4));
+  RamseteController ramsete = new RamseteController(2, 0.7);
+  DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(0.55);
+
+  PowerDistribution pdp = new PowerDistribution(0, ModuleType.kCTRE);
   AHRS gyro = new AHRS(); // NavX2 gyro
   Timer timer = new Timer(); 
+  Compressor compressor = new Compressor(0, PneumaticsModuleType.CTREPCM);
+  DoubleSolenoid solenoid = new DoubleSolenoid(PneumaticsModuleType.CTREPCM, 0, 1);
+
+  WPI_TalonFX topArm = new WPI_TalonFX(0); // top arm motor
+  CANSparkMax bottomArm = new CANSparkMax(1, MotorType.kBrushed); // bottom arm motor
+  SparkMaxAbsoluteEncoder bottomArmEncoder = bottomArm.getAbsoluteEncoder(SparkMaxAbsoluteEncoder.Type.kDutyCycle);
+
+  XboxController armController = new XboxController(0);
+  Joystick stick = new Joystick(1);
+
   double encoderTicksPerMeter = 2048*10.71/(0.0254*6*Math.PI); // theoretical 45812 ticks per meter traveled
   double encoderTicksPerRev = 2048*12*64/16; // theoretical 98304 ticks per revolution of top arm
+  
   double stage2StartTime;
-  PowerDistribution pdp = new PowerDistribution(0, ModuleType.kCTRE);
   double totalCurrent = 0;
   double topArmCurrent = 0;
 
-  // Pneumatics Variables
-  Compressor compressor = new Compressor(0, PneumaticsModuleType.CTREPCM);
-  DoubleSolenoid solenoid = new DoubleSolenoid(PneumaticsModuleType.CTREPCM, 0, 1);
   boolean solenoidToggle = false;
 
   // Arm Control Variables
@@ -81,23 +94,6 @@ public class Robot extends TimedRobot {
   double clawOpenTime;
   boolean clawAutoClosed = false;
   double clawAutoCloseTime;
-  
-  // Drive Variables
-  double minJoystickDriveResponse = 0.24;
-
-  // Controller Variables
-  double d_leftStickY;
-  double d_leftStickX;
-  double d_rightStickY;
-  double d_rightStickX;
-  double d_leftTrigger;
-  double d_rightTrigger;
-  double a_leftStickY;
-  double a_leftStickX;
-  double a_rightStickY;
-  double a_rightStickX;
-  double a_leftTrigger;
-  double a_rightTrigger;
 
   // Motor Variables
   double positionLeftBack;
@@ -115,7 +111,7 @@ public class Robot extends TimedRobot {
   // Auto Variables
   int autoStage = 1;
   PIDController pidSpeed = new PIDController(1, 0.2, 0.15);
-  int settleInterations = 0;
+  int settleIterations = 0;
 
   // Digital Inputs
   DigitalInput input0 = new DigitalInput(0);
@@ -124,11 +120,6 @@ public class Robot extends TimedRobot {
   boolean sensor1;
 
   double autoClawOpenStageTime;
-
-  DifferentialDriveOdometry odometry = new DifferentialDriveOdometry(new Rotation2d(0), 0, 0);
-  PathPlannerTrajectory path = PathPlanner.loadPath("Test Path", new PathConstraints(0.8, 0.4));
-  RamseteController ramsete = new RamseteController(2, 0.7);
-  DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(0.55);
   double robotX = 0;
   double robotY = 0;
 
@@ -149,6 +140,11 @@ public class Robot extends TimedRobot {
   public void autonomousInit() {
     timer.reset();
     compressor.enableDigital();
+
+    // Claw Positioning
+    bottomArmSetpoint = 0;
+    topArmSetpoint = -0.068;
+    armAtSetpoint = false;
   }
 
   @Override
@@ -179,34 +175,20 @@ public class Robot extends TimedRobot {
     updateVariables();
 
     // Proximity Sensor Code
-    if (!clawAutoClosed && proximitySensorStatus && (a_leftTrigger > 0.25)) {
+    if (!clawAutoClosed && proximitySensorStatus && (armController.getLeftTriggerAxis() > 0.25)) {
       closeClaw();
       clawAutoClosed = true;
       clawAutoCloseTime = time;
     } 
-    if (!proximitySensorStatus && (a_leftTrigger > 0.25) && ((time - clawAutoCloseTime) > 1.0)) {
+    if (!proximitySensorStatus && (armController.getLeftTriggerAxis() > 0.25) && ((time - clawAutoCloseTime) > 1.0)) {
       openClaw();
       clawAutoClosed = false;
     }
 
     // Drive Code: leftStickY controls speed, rightStickX controls rotation.
-    double translation = 0;
-    if (Math.abs(d_leftStickY) > 0.04) {
-      if (d_leftStickY > 0) {
-        translation = -minJoystickDriveResponse-(1-minJoystickDriveResponse)*d_leftStickY*d_leftStickY;
-      } else {
-        translation = minJoystickDriveResponse+(1-minJoystickDriveResponse)*d_leftStickY*d_leftStickY;
-      }
-   }
-   double rotation = 0;
-   if (Math.abs(d_rightStickX) > 0.04) {
-     if (d_rightStickX > 0) {
-       rotation = -minJoystickDriveResponse-(0.5-minJoystickDriveResponse)*d_rightStickX*d_rightStickX;
-     } else {
-      rotation = minJoystickDriveResponse+(0.5-minJoystickDriveResponse)*d_rightStickX*d_rightStickX;
-     }
-   }
-    drive.arcadeDrive(translation, rotation);
+    double xSpeed = xAccLimiter.calculate(MathUtil.applyDeadband(-stick.getY(),0.1));
+    double rotSpeed = angAccLimiter.calculate(MathUtil.applyDeadband(-stick.getZ(),0.1));
+    drive.arcadeDrive(xSpeed, rotSpeed);
 
     // Left bumper: close the claw
     if (armController.getLeftBumperPressed()) {
@@ -220,7 +202,7 @@ public class Robot extends TimedRobot {
     
     // Arm actuation code
     // Hands back user control to arm operator after setpoint malfunction
-    if (armController.getPOV() == 360) {
+    if (armController.getPOV() == 0) {
       topArmSetpoint = positionTopArm;
       armAtSetpoint = true;
     }
@@ -249,13 +231,13 @@ public class Robot extends TimedRobot {
       armAtSetpoint = false;
     }
     // Cube Scoring (Top)
-    if (armController.getPOV() == 0) {
+    if (armController.getPOV() == 180) {
       bottomArmSetpoint = 0.245;
       topArmSetpoint = 0.043;
       armAtSetpoint = false;
     } 
     // Cone Scoring (Top)
-    if (a_rightTrigger > 0.25) {
+    if (armController.getRightTriggerAxis() > 0.25) {
       bottomArmSetpoint = 0.256;
       topArmSetpoint = 0.110;
       armAtSetpoint = false;
@@ -291,7 +273,7 @@ public class Robot extends TimedRobot {
     updateVariables();
 
     // Resets all timer/encoder/arm variables to 0 before the match.
-    if (driveController.getStartButtonPressed()) {
+    if (stick.getRawButtonPressed(7)) {
       leftBack.setSelectedSensorPosition(0);
       leftFront.setSelectedSensorPosition(0);
       rightBack.setSelectedSensorPosition(0);
@@ -302,8 +284,9 @@ public class Robot extends TimedRobot {
       armAtSetpoint = true;
       pidSpeed.reset();
       autoStage = 1;
-      settleInterations = 0;
+      settleIterations = 0;
       timer.reset();
+      gyro.zeroYaw();
       updateVariables();
     }
   }
@@ -348,17 +331,17 @@ public class Robot extends TimedRobot {
   }
 
   public void moveArmManual() {
-    if (Math.abs(a_leftStickY) > armDeadband && (positionBottomArm > 0.05 || a_leftStickY < 0)) {
-      bottomArm.set(-a_leftStickY);
+    if (Math.abs(armController.getLeftY()) > armDeadband && (positionBottomArm > 0.05 || armController.getLeftY() < 0)) {
+      bottomArm.set(-armController.getLeftY());
     } else {
       bottomArm.set(0);
     }
 
-    if (Math.abs(a_rightStickY) > armDeadband) {
-      if (a_rightStickY > 0) {
-        topArmSetpoint = topArmSetpoint - (minJoystickTopArmResponse + (1-minJoystickTopArmResponse)*a_rightStickY*a_rightStickY)*armCoarseAdjustRate;
-      } else if (a_rightStickY < 0) {
-        topArmSetpoint = topArmSetpoint + (minJoystickTopArmResponse + (1-minJoystickTopArmResponse)*a_rightStickY*a_rightStickY)*armCoarseAdjustRate;
+    if (Math.abs(armController.getRightY()) > armDeadband) {
+      if (armController.getRightY() > 0) {
+        topArmSetpoint = topArmSetpoint - (minJoystickTopArmResponse + (1-minJoystickTopArmResponse)*armController.getRightY()*armController.getRightY())*armCoarseAdjustRate;
+      } else if (armController.getRightY() < 0) {
+        topArmSetpoint = topArmSetpoint + (minJoystickTopArmResponse + (1-minJoystickTopArmResponse)*armController.getRightY()*armController.getRightY())*armCoarseAdjustRate;
       }
     }
     if (topArmSetpoint > 0.6) {
@@ -451,25 +434,12 @@ public class Robot extends TimedRobot {
     yaw = gyro.getYaw(); // Starts at 0. The turning angle.
     pitch = gyro.getPitch(); // Starts at 0. The wheelie angle. 
     time = timer.get(); // Time in seconds. Resets to 0 after the robot is enabled/disabled.
-    d_leftStickY = driveController.getLeftY();
-    d_leftStickX = driveController.getLeftX();
-    d_rightStickY = driveController.getRightY();
-    d_rightStickX = driveController.getRightX();
-    d_leftTrigger = driveController.getLeftTriggerAxis();
-    d_rightTrigger = driveController.getRightTriggerAxis();
-    a_leftStickY = armController.getLeftY();
-    a_leftStickX = armController.getLeftX();
-    a_rightStickY = armController.getRightY();
-    a_rightStickX = armController.getRightX();
-    a_leftTrigger = armController.getLeftTriggerAxis();
-    a_rightTrigger = armController.getRightTriggerAxis();
     totalCurrent = pdp.getTotalCurrent();
     topArmCurrent = pdp.getCurrent(12);
     bottomArmAngle = positionBottomArm*360+10;
     topArmAngle = 90 - bottomArmAngle + 10 + positionTopArm*360;
     clawX = -0.72*Math.cos(bottomArmAngle*Math.PI/180) + 0.92*Math.cos(topArmAngle*Math.PI/180);
     clawZ = 0.72*Math.sin(bottomArmAngle*Math.PI/180) + 0.92*Math.sin(topArmAngle*Math.PI/180);
-
     odometry.update(Rotation2d.fromDegrees(-yaw), (positionLeftBack+positionLeftFront)/2, (positionRightBack+positionRightFront)/2);
     robotX = odometry.getPoseMeters().getX();
     robotY = odometry.getPoseMeters().getY();
@@ -489,21 +459,9 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Left Front Position", positionLeftFront);
     SmartDashboard.putNumber("Right Back Position", positionRightBack);
     SmartDashboard.putNumber("Right Front Position", positionRightFront);
-    SmartDashboard.putNumber("Yaw", yaw);
+    SmartDashboard.putNumber("Yaw", -yaw);
     SmartDashboard.putNumber("Pitch", pitch);
     SmartDashboard.putNumber("Time", time);
-    SmartDashboard.putNumber("d_leftStickY", d_leftStickY);
-    SmartDashboard.putNumber("d_leftStickX", d_leftStickX);
-    SmartDashboard.putNumber("d_rightStickY", d_rightStickY);
-    SmartDashboard.putNumber("d_rightStickX", d_rightStickX);
-    SmartDashboard.putNumber("d_leftTrigger", d_leftTrigger);
-    SmartDashboard.putNumber("d_rightTrigger", d_rightTrigger);
-    SmartDashboard.putNumber("a_leftStickY", a_leftStickY);
-    SmartDashboard.putNumber("a_leftStickX", a_leftStickX);
-    SmartDashboard.putNumber("a_rightStickY", a_rightStickY);
-    SmartDashboard.putNumber("a_rightStickX", a_rightStickX);
-    SmartDashboard.putNumber("a_leftTrigger", a_leftTrigger);
-    SmartDashboard.putNumber("a_rightTrigger", a_rightTrigger);
     SmartDashboard.putBoolean("Solenoid", solenoidToggle);
     SmartDashboard.putBoolean("At Setpoint", armAtSetpoint);
     SmartDashboard.putBoolean("Top At Setpoint", topArmAtSetpoint);
