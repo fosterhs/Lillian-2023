@@ -52,9 +52,6 @@ public class Robot extends TimedRobot {
   PathPlannerTrajectory path = PathPlanner.loadPath("Test Path", new PathConstraints(0.8, 0.4));
   RamseteController ramsete = new RamseteController(2, 0.7);
   DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(0.55);
-  double initialXPos;
-  double initialYPos;
-  double initialAngPos;
 
   PowerDistribution pdp = new PowerDistribution(0, ModuleType.kCTRE);
   AHRS gyro = new AHRS(); // NavX2 gyro
@@ -141,6 +138,7 @@ public class Robot extends TimedRobot {
 
     PathPlannerState startingState = (PathPlannerState) path.sample(0);
     odometry.resetPosition(Rotation2d.fromDegrees(-yaw), (positionLeftBack+positionLeftFront)/2, (positionRightBack+positionRightFront)/2, startingState.poseMeters);
+    ramsete.setTolerance(new Pose2d(0.03, 0.03, Rotation2d.fromDegrees(3))); 
 
     // Claw Positioning
     bottomArmSetpoint = 0;
@@ -157,10 +155,10 @@ public class Robot extends TimedRobot {
     DifferentialDriveWheelSpeeds wheelSpeeds = kinematics.toWheelSpeeds(chassisSpeeds);
     double leftSpeed = wheelSpeeds.leftMetersPerSecond/10*encoderTicksPerMeter;
     double rightSpeed = wheelSpeeds.rightMetersPerSecond/10*encoderTicksPerMeter;
-    leftBack.set(ControlMode.Velocity, leftSpeed);
     leftFront.set(ControlMode.Velocity, leftSpeed);
-    rightBack.set(ControlMode.Velocity, rightSpeed);
     rightFront.set(ControlMode.Velocity, rightSpeed);
+    leftBack.set(ControlMode.Velocity, leftSpeed);
+    rightBack.set(ControlMode.Velocity, rightSpeed);
     drive.feed();
 
     if (!armAtSetpoint) {
