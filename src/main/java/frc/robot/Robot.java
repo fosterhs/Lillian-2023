@@ -17,6 +17,7 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.RamseteController;
 import edu.wpi.first.math.filter.SlewRateLimiter;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
@@ -51,6 +52,9 @@ public class Robot extends TimedRobot {
   PathPlannerTrajectory path = PathPlanner.loadPath("Test Path", new PathConstraints(0.8, 0.4));
   RamseteController ramsete = new RamseteController(2, 0.7);
   DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(0.55);
+  double initialXPos;
+  double initialYPos;
+  double initialAngPos;
 
   PowerDistribution pdp = new PowerDistribution(0, ModuleType.kCTRE);
   AHRS gyro = new AHRS(); // NavX2 gyro
@@ -68,7 +72,6 @@ public class Robot extends TimedRobot {
   double encoderTicksPerMeter = 2048*10.71/(0.0254*6*Math.PI); // theoretical 45812 ticks per meter traveled
   double encoderTicksPerRev = 2048*12*64/16; // theoretical 98304 ticks per revolution of top arm
   
-  double stage2StartTime;
   double totalCurrent = 0;
   double topArmCurrent = 0;
 
@@ -123,7 +126,6 @@ public class Robot extends TimedRobot {
   double robotX = 0;
   double robotY = 0;
 
-  @Override
   public void robotInit() {
     initializeMotors();
     gyro.calibrate();
@@ -133,13 +135,12 @@ public class Robot extends TimedRobot {
     updateVariables();
   }
 
-  @Override
-  public void robotPeriodic() {}
-
-  @Override
   public void autonomousInit() {
     timer.reset();
     compressor.enableDigital();
+
+    PathPlannerState startingState = (PathPlannerState) path.sample(0);
+    odometry.resetPosition(Rotation2d.fromDegrees(-yaw), (positionLeftBack+positionLeftFront)/2, (positionRightBack+positionRightFront)/2, startingState.poseMeters);
 
     // Claw Positioning
     bottomArmSetpoint = 0;
@@ -147,13 +148,12 @@ public class Robot extends TimedRobot {
     armAtSetpoint = false;
   }
 
-  @Override
   public void autonomousPeriodic() {
     updateVariables();
 
     // Trajectory following
     PathPlannerState currentGoal = (PathPlannerState) path.sample(timer.get());
-    ChassisSpeeds chassisSpeeds = ramsete.calculate(odometry.getPoseMeters(), currentGoal);
+    ChassisSpeeds chassisSpeeds = ramsete.calculate(new Pose2d(odometry.getPoseMeters().getX(), odometry.getPoseMeters().getY(), odometry.getPoseMeters().getRotation()), currentGoal);
     DifferentialDriveWheelSpeeds wheelSpeeds = kinematics.toWheelSpeeds(chassisSpeeds);
     double leftSpeed = wheelSpeeds.leftMetersPerSecond/10*encoderTicksPerMeter;
     double rightSpeed = wheelSpeeds.rightMetersPerSecond/10*encoderTicksPerMeter;
@@ -162,15 +162,17 @@ public class Robot extends TimedRobot {
     rightBack.set(ControlMode.Velocity, rightSpeed);
     rightFront.set(ControlMode.Velocity, rightSpeed);
     drive.feed();
+
+    if (!armAtSetpoint) {
+      moveArmToSetpoint();
+    }
   }
 
-  @Override
   public void teleopInit() {
     timer.reset();
     compressor.enableDigital();
   }
 
-  @Override
   public void teleopPeriodic() {
     updateVariables();
 
@@ -262,13 +264,11 @@ public class Robot extends TimedRobot {
     }
   }
 
-  @Override
   public void disabledInit() {
     timer.reset();
     compressor.disable();
   }
 
-  @Override
   public void disabledPeriodic() {
     updateVariables();
 
@@ -290,18 +290,6 @@ public class Robot extends TimedRobot {
       updateVariables();
     }
   }
-
-  @Override
-  public void testInit() {}
-
-  @Override
-  public void testPeriodic() {}
-
-  @Override
-  public void simulationInit() {}
-
-  @Override
-  public void simulationPeriodic() {}
 
   public void moveArmToSetpoint() {
     bottomArmAtSetpoint = false;
