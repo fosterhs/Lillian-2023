@@ -37,7 +37,7 @@ public class Robot extends TimedRobot {
         claw.open();
       }
       if (timer.get() > 1.0) { // Delays another 0.3s
-        pathFollower.setReversed(true);
+        pathFollower.setReversal(true);
         pathFollower.loadPath("Auto Path", drivetrain.getYaw(), drivetrain.getRightPos(), drivetrain.getLeftPos());
         arm.setSetpoint(0.057, -0.255); // Front Floor Pickup
         autoStage++;
