@@ -24,13 +24,13 @@ public class Drivetrain {
   private DifferentialDrive tank = new DifferentialDrive(motorGroupLeft, motorGroupRight);
   private AHRS gyro = new AHRS(); // NavX2 gyro
   public static final double trackWidth = 0.55;
-  private static final double falconTicksPerRev = 2048;
+  private static final double falconTicksPerRev = 2048.0;
   private static final double wheelCirc = 6*0.0254*Math.PI;
   private static final double gearRatio = 10.71;
   private static final double ticksPerMeter = falconTicksPerRev*gearRatio/wheelCirc;
   private static final double maxAngVelPower = 0.55;
-  private static final double xAccLimit = 3;
-  private static final double AngAccLimit = 3/maxAngVelPower;
+  private static final double xAccLimit = 3.0;
+  private static final double AngAccLimit = 3.0/maxAngVelPower;
   private static final double driveControllerDeadband = 0.05;
   private SlewRateLimiter xAccLimiter = new SlewRateLimiter(xAccLimit);
   private SlewRateLimiter angAccLimiter = new SlewRateLimiter(AngAccLimit);
@@ -44,7 +44,7 @@ public class Drivetrain {
     rightBack.setInverted(true);
     rightFront.setInverted(true);
     gyro.calibrate();
-    Timer.delay(2); // calibration delay for gyro
+    Timer.delay(2.0); // calibration delay for gyro
     gyro.zeroYaw();
   }
 

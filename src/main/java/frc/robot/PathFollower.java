@@ -20,7 +20,7 @@ public class PathFollower {
     Timer timer;
     private double xTol = 0.03;
     private double yTol = 0.03;
-    private double angTol = 3;
+    private double angTol = 3.0;
     private double maxVel = 0.8;
     private double maxAcc = 0.4;
     private boolean reversal = false;
