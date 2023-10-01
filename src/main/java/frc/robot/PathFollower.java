@@ -23,6 +23,7 @@ public class PathFollower {
     private double angTol = 3;
     private double maxVel = 0.8;
     private double maxAcc = 0.4;
+    private boolean reversed = false;
     private boolean atEndpoint = false;
 
   public PathFollower() {}
@@ -31,7 +32,7 @@ public class PathFollower {
   public void loadPath(String pathName, double currentYaw, double currentRightPos, double currentLeftPos) {
     timer = new Timer(); 
     timer.start();
-    path = PathPlanner.loadPath(pathName, new PathConstraints(maxVel, maxAcc));
+    path = PathPlanner.loadPath(pathName, new PathConstraints(maxVel, maxAcc), reversed);
     PathPlannerState startingState = path.getInitialState();
     odometry = new DifferentialDriveOdometry(Rotation2d.fromDegrees(currentYaw), currentLeftPos, currentRightPos, startingState.poseMeters);
     ramsete = new RamseteController(2, 0.7);
@@ -70,6 +71,10 @@ public class PathFollower {
 
   public void setMaxVel(double desiredMaxVel) {
     maxVel = desiredMaxVel;
+  }
+
+  public void setReversed(boolean desiredReversed) {
+    reversed = desiredReversed;
   }
 
   public void setMaxAcc(double desiredMaxAcc) {

@@ -69,11 +69,11 @@ public class Drivetrain {
   }
 
   public double getLeftPos() {
-    return (leftFront.getSelectedSensorPosition() + leftBack.getSelectedSensorPosition())/2;
+    return (leftFront.getSelectedSensorPosition() + leftBack.getSelectedSensorPosition())/(2*ticksPerMeter);
   }
 
   public double getRightPos() {
-    return (rightFront.getSelectedSensorPosition() + rightBack.getSelectedSensorPosition())/2;
+    return (rightFront.getSelectedSensorPosition() + rightBack.getSelectedSensorPosition())/(2*ticksPerMeter);
   }
 
   public double getYaw() {

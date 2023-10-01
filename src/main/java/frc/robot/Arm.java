@@ -14,13 +14,13 @@ public class Arm {
   private WPI_TalonFX topArm = new WPI_TalonFX(0); // top arm motor
   private CANSparkMax bottomArm = new CANSparkMax(1, MotorType.kBrushed); // bottom arm motor
   private SparkMaxAbsoluteEncoder bottomArmEncoder = bottomArm.getAbsoluteEncoder(SparkMaxAbsoluteEncoder.Type.kDutyCycle);
-  private static final double planetaryRatio = 12;
-  private static final double chainRatio = 64/16;
-  private static final double falconTicksPerRev = 2048;
+  private static final double planetaryRatio = 12.0;
+  private static final double chainRatio = 64.0/16;
+  private static final double falconTicksPerRev = 2048.0;
   private static final double ticksPerRev = falconTicksPerRev*planetaryRatio*chainRatio;
   private static final double armControllerDeadband = 0.05;
-  private static final double bottomLowLimit = 10/360; 
-  private static final double topManualAdjustRate = 144/(360*50); // maximum 144 degrees per second
+  private static final double bottomLowLimit = 10.0/360; 
+  private static final double topManualAdjustRate = 144.0/(360*50); // maximum 144 degrees per second
   private static final double minTopArmResponse = 0.1;
   private static final double topLowLimit = -0.3;
   private static final double topHighLimit = 0.6;
@@ -29,8 +29,8 @@ public class Arm {
   private boolean bottomAtSetpoint = true;
   private boolean topAtSetpoint = true;
   private boolean atSetpoint = true;
-  private double bottomSetpoint = 0;
-  private double topSetpoint = 0;
+  private double bottomSetpoint = 0.0;
+  private double topSetpoint = 0.0;
 
   public Arm() {
     initializeArmMotors();
@@ -73,22 +73,20 @@ public class Arm {
       bottomArm.set(0);
     }
     
-    double currentPosTop = getPosTop();
-    double nextPosTop = currentPosTop;
     if (Math.abs(powerTop) > armControllerDeadband) {
       if (powerTop > 0) {
-        nextPosTop = currentPosTop + (minTopArmResponse + (1-minTopArmResponse)*Math.pow(powerTop, 2))*topManualAdjustRate;
+        topSetpoint = topSetpoint + (minTopArmResponse + (1-minTopArmResponse)*Math.pow(powerTop, 2))*topManualAdjustRate;
       } else {
-        nextPosTop = currentPosTop - (minTopArmResponse + (1-minTopArmResponse)*Math.pow(powerTop, 2))*topManualAdjustRate;
+        topSetpoint = topSetpoint - (minTopArmResponse + (1-minTopArmResponse)*Math.pow(powerTop, 2))*topManualAdjustRate;
       }
     }
-    if (nextPosTop > topHighLimit) {
-      nextPosTop = topHighLimit;
+    if (topSetpoint > topHighLimit) {
+      topSetpoint = topHighLimit;
     }
-    if (nextPosTop < topLowLimit) {
-      nextPosTop = topLowLimit;
+    if (topSetpoint < topLowLimit) {
+      topSetpoint = topLowLimit;
     }
-    topArm.set(ControlMode.MotionMagic, nextPosTop*ticksPerRev);
+    topArm.set(ControlMode.MotionMagic, topSetpoint*ticksPerRev);
   }
 
   // Hands back manual control in the case of an arm collision where the setpoint cannot be achieved.

@@ -20,7 +20,6 @@ public class Robot extends TimedRobot {
     claw.enableCompressor();
     claw.close();
     arm.setSetpoint(0.245, 0.043); // Cube Score (Top)
-    pathFollower.loadPath("Test Path", drivetrain.getYaw(), drivetrain.getRightPos(), drivetrain.getLeftPos());
   }
 
   public void autonomousPeriodic() {
@@ -38,8 +37,9 @@ public class Robot extends TimedRobot {
         claw.open();
       }
       if (timer.get() > 1.0) { // Delays another 0.3s
-        pathFollower.loadPath("Test Path", drivetrain.getYaw(), drivetrain.getRightPos(), drivetrain.getLeftPos());
-        arm.setSetpoint(0.165, 0.539); // Rear Floor Pickup
+        pathFollower.setReversed(true);
+        pathFollower.loadPath("Auto Path", drivetrain.getYaw(), drivetrain.getRightPos(), drivetrain.getLeftPos());
+        arm.setSetpoint(0.057, -0.255); // Front Floor Pickup
         autoStage++;
       }
     }
