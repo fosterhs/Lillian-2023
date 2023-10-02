@@ -43,7 +43,7 @@ public class Drivetrain {
   private DifferentialDriveOdometry odometry;
   private PathPlannerTrajectory path;
   private RamseteController ramsete;
-  private static final DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(trackWidth);
+  private DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(trackWidth);
   private Timer timer;
   private double pathXTol = 0.03;
   private double pathYTol = 0.03;
@@ -73,12 +73,8 @@ public class Drivetrain {
   
   // Autonomous control of the drivetrain based on calculated wheel speeds. One of the driving methods should be called each period.
   private void setWheelSpeeds(DifferentialDriveWheelSpeeds wheelSpeeds) {
-    double rightVel = wheelSpeeds.rightMetersPerSecond;
-    double leftVel = wheelSpeeds.leftMetersPerSecond;
-    double rightVelCTREUnits = rightVel/10*ticksPerMeter;
-    double leftVelCTREUnits = leftVel/10*ticksPerMeter;
-    rightFront.set(ControlMode.Velocity, rightVelCTREUnits);
-    leftFront.set(ControlMode.Velocity, leftVelCTREUnits);
+    rightFront.set(ControlMode.Velocity, wheelSpeeds.rightMetersPerSecond/10*ticksPerMeter);
+    leftFront.set(ControlMode.Velocity, wheelSpeeds.rightMetersPerSecond/10*ticksPerMeter);
     rightBack.set(ControlMode.Follower, 4);
     leftBack.set(ControlMode.Follower, 2);
     tank.feed();
@@ -100,7 +96,7 @@ public class Drivetrain {
     return gyro.getPitch();
   }
 
-  // Loads the path. Should be called immediately before the user would like the robot to begin tracking the path.
+  // Loads the path. Should be called immediately before the user would like the robot to begin tracking the path. Assumes the robot is starting at the field position indicated at the start of the path.
   public void loadPath(String pathName) {
     timer = new Timer(); 
     timer.start();

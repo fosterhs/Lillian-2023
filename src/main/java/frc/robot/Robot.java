@@ -45,7 +45,7 @@ public class Robot extends TimedRobot {
         autoStage++;
       }
     }
-    if (autoStage == 3) { // Follows the PathPlanner trajectory to the game piece. Moves arm to Rear Floor Pickup.
+    if (autoStage == 3) { // Follows the PathPlanner trajectory to the game piece. Moves arm to Front Floor Pickup.
       arm.moveToSetpoint();
       drivetrain.followPath();
       if (arm.atSetpoint() && drivetrain.atEndpoint()) {
