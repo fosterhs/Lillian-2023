@@ -5,12 +5,18 @@ import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.can.TalonFXConfiguration;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
 import com.kauailabs.navx.frc.AHRS;
+import com.pathplanner.lib.PathConstraints;
+import com.pathplanner.lib.PathPlanner;
+import com.pathplanner.lib.PathPlannerTrajectory;
+import com.pathplanner.lib.PathPlannerTrajectory.PathPlannerState;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.RamseteController;
 import edu.wpi.first.math.filter.SlewRateLimiter;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
+import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
 import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
-import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
 
@@ -23,7 +29,7 @@ public class Drivetrain {
   private MotorControllerGroup motorGroupRight = new MotorControllerGroup(rightFront, rightBack);
   private DifferentialDrive tank = new DifferentialDrive(motorGroupLeft, motorGroupRight);
   private AHRS gyro = new AHRS(); // NavX2 gyro
-  public static final double trackWidth = 0.55;
+  private static final double trackWidth = 0.55;
   private static final double falconTicksPerRev = 2048.0;
   private static final double wheelCirc = 6*0.0254*Math.PI;
   private static final double gearRatio = 10.71;
@@ -34,8 +40,18 @@ public class Drivetrain {
   private static final double driveControllerDeadband = 0.05;
   private SlewRateLimiter xAccLimiter = new SlewRateLimiter(xAccLimit);
   private SlewRateLimiter angAccLimiter = new SlewRateLimiter(AngAccLimit);
-  private PowerDistribution pdp = new PowerDistribution(0, ModuleType.kCTRE);
-  
+  private DifferentialDriveOdometry odometry;
+  private PathPlannerTrajectory path;
+  private RamseteController ramsete;
+  private static final DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(trackWidth);
+  private Timer timer;
+  private double pathXTol = 0.03;
+  private double pathYTol = 0.03;
+  private double pathAngTol = 3.0;
+  private double maxPathVel = 0.8;
+  private double maxPathAcc = 0.4;
+  private boolean pathReversal = false;
+
   public Drivetrain() {
     initializeDriveMotor(rightFront);
     initializeDriveMotor(rightBack);
@@ -56,7 +72,7 @@ public class Drivetrain {
   }
   
   // Autonomous control of the drivetrain based on calculated wheel speeds. One of the driving methods should be called each period.
-  public void setWheelSpeeds(DifferentialDriveWheelSpeeds wheelSpeeds) {
+  private void setWheelSpeeds(DifferentialDriveWheelSpeeds wheelSpeeds) {
     double rightVel = wheelSpeeds.rightMetersPerSecond;
     double leftVel = wheelSpeeds.leftMetersPerSecond;
     double rightVelCTREUnits = rightVel/10*ticksPerMeter;
@@ -84,8 +100,54 @@ public class Drivetrain {
     return gyro.getPitch();
   }
 
-  public double getTotalCurrent() {
-    return pdp.getTotalCurrent();
+  // Loads the path. Should be called immediately before the user would like the robot to begin tracking the path.
+  public void loadPath(String pathName) {
+    timer = new Timer(); 
+    timer.start();
+    path = PathPlanner.loadPath(pathName, new PathConstraints(maxPathVel, maxPathAcc), pathReversal);
+    PathPlannerState startingState = path.getInitialState();
+    odometry = new DifferentialDriveOdometry(Rotation2d.fromDegrees(getYaw()), getLeftPos(), getRightPos(), startingState.poseMeters);
+    ramsete = new RamseteController(2, 0.7);
+  }
+
+  // Tracks the path. Should be called each period until the endpoint is reached.
+  public void followPath() {
+    PathPlannerState currentGoal = (PathPlannerState) path.sample(timer.get());
+    odometry.update(Rotation2d.fromDegrees(getYaw()), getLeftPos(), getRightPos());
+    setWheelSpeeds(kinematics.toWheelSpeeds(ramsete.calculate(odometry.getPoseMeters(), currentGoal)));
+  }
+
+  // Tells whether the robot has reached the endpoint, within the defined tolerance.
+  public boolean atEndpoint() {
+    PathPlannerState endState = path.getEndState();
+    return Math.abs(odometry.getPoseMeters().getRotation().getDegrees() - endState.poseMeters.getRotation().getDegrees()) < pathAngTol 
+    && Math.abs(odometry.getPoseMeters().getX() - endState.poseMeters.getX()) < pathXTol 
+    && Math.abs(odometry.getPoseMeters().getY() - endState.poseMeters.getY()) < pathYTol;
+  }
+  
+  // Path parameters should be adjusted prior to calling loadPath()
+  public void setPathXTol(double desiredXTol) {
+    pathXTol = desiredXTol;
+  }
+
+  public void setPathYTol(double desiredYTol) {
+    pathYTol = desiredYTol;
+  }
+
+  public void setPathAngTol(double desiredAngTol) {
+    pathAngTol = desiredAngTol;
+  }
+
+  public void setMaxPathVel(double desiredMaxVel) {
+    maxPathVel = desiredMaxVel;
+  }
+
+  public void setPathReversal(boolean desiredReversal) {
+    pathReversal = desiredReversal;
+  }
+
+  public void setMaxPathAcc(double desiredMaxAcc) {
+    maxPathAcc = desiredMaxAcc;
   }
 
   private void initializeDriveMotor(WPI_TalonFX motor) {

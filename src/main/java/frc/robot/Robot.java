@@ -1,16 +1,18 @@
 package frc.robot;
 
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class Robot extends TimedRobot {
   Drivetrain drivetrain = new Drivetrain();
   Arm arm = new Arm();
   Claw claw = new Claw();
-  PathFollower pathFollower = new PathFollower();
+  PowerDistribution pdp = new PowerDistribution(0, ModuleType.kCTRE);
   Timer timer = new Timer();
   XboxController armCont = new XboxController(0);
   Joystick stick = new Joystick(1);
@@ -37,16 +39,16 @@ public class Robot extends TimedRobot {
         claw.open();
       }
       if (timer.get() > 1.0) { // Delays another 0.3s
-        pathFollower.setReversal(true);
-        pathFollower.loadPath("Auto Path", drivetrain.getYaw(), drivetrain.getRightPos(), drivetrain.getLeftPos());
+        drivetrain.setPathReversal(true);
+        drivetrain.loadPath("Auto Path");
         arm.setSetpoint(0.057, -0.255); // Front Floor Pickup
         autoStage++;
       }
     }
     if (autoStage == 3) { // Follows the PathPlanner trajectory to the game piece. Moves arm to Rear Floor Pickup.
       arm.moveToSetpoint();
-      drivetrain.setWheelSpeeds(pathFollower.getWheelSpeeds(drivetrain.getYaw(), drivetrain.getLeftPos(), drivetrain.getRightPos())); 
-      if (arm.atSetpoint() && pathFollower.atEndpoint()) {
+      drivetrain.followPath();
+      if (arm.atSetpoint() && drivetrain.atEndpoint()) {
         autoStage++;
       }
     }
@@ -122,7 +124,7 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("posTopArm", arm.getPosTop());
     SmartDashboard.putNumber("ClawX", arm.getClawX());
     SmartDashboard.putNumber("ClawZ", arm.getClawZ());
-    SmartDashboard.putNumber("Total Current", drivetrain.getTotalCurrent());
+    SmartDashboard.putNumber("Total Current", pdp.getTotalCurrent());
     SmartDashboard.putNumber("Drivetrain leftPos", drivetrain.getLeftPos());
     SmartDashboard.putNumber("Drivetrain rightPos", drivetrain.getRightPos());
     SmartDashboard.putNumber("Yaw", drivetrain.getYaw());
