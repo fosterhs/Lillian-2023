@@ -151,9 +151,9 @@ public class Drivetrain {
 
     TalonFXConfiguration config = new TalonFXConfiguration();
     config.supplyCurrLimit.enable = true;
-    config.supplyCurrLimit.triggerThresholdCurrent = 10; // max current in amps (40 was original)
+    config.supplyCurrLimit.triggerThresholdCurrent = 40; // max current in amps (40 was original)
     config.supplyCurrLimit.triggerThresholdTime = 0.1; // max time exceeding max current in seconds
-    config.supplyCurrLimit.currentLimit = 10; // max current after exceeding threshold 
+    config.supplyCurrLimit.currentLimit = 40; // max current after exceeding threshold 
     motor.configAllSettings(config);
 
     motor.setSelectedSensorPosition(0); // sets encoder to 0
