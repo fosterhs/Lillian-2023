@@ -127,6 +127,8 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Total Current", pdp.getTotalCurrent());
     SmartDashboard.putNumber("Drivetrain leftPos", drivetrain.getLeftPos());
     SmartDashboard.putNumber("Drivetrain rightPos", drivetrain.getRightPos());
+    SmartDashboard.putNumber("RobotX", drivetrain.getRobotX());
+    SmartDashboard.putNumber("RobotY", drivetrain.getRobotY());
     SmartDashboard.putNumber("Yaw", drivetrain.getYaw());
     SmartDashboard.putNumber("Pitch", drivetrain.getPitch()); 
     SmartDashboard.putNumber("Auto Stage", autoStage); 

@@ -11,13 +11,13 @@ import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import edu.wpi.first.math.MathUtil;
 
 public class Arm {
-  private WPI_TalonFX topArm = new WPI_TalonFX(0); // top arm motor
-  private CANSparkMax bottomArm = new CANSparkMax(1, MotorType.kBrushed); // bottom arm motor
-  private SparkMaxAbsoluteEncoder bottomArmEncoder = bottomArm.getAbsoluteEncoder(SparkMaxAbsoluteEncoder.Type.kDutyCycle);
+  private final WPI_TalonFX topArm = new WPI_TalonFX(0); // top arm motor
+  private final CANSparkMax bottomArm = new CANSparkMax(1, MotorType.kBrushed); // bottom arm motor
+  private final SparkMaxAbsoluteEncoder bottomArmEncoder = bottomArm.getAbsoluteEncoder(SparkMaxAbsoluteEncoder.Type.kDutyCycle);
   private static final double planetaryRatio = 12.0;
   private static final double chainRatio = 64.0/16;
   private static final double falconTicksPerRev = 2048.0;
-  private static final double ticksPerRev = falconTicksPerRev*planetaryRatio*chainRatio;
+  private static final double armTicksPerRev = falconTicksPerRev*planetaryRatio*chainRatio;
   private static final double armControllerDeadband = 0.05;
   private static final double bottomLowLimit = 10.0/360; 
   private static final double topManualAdjustRate = 144.0/(360*50); // maximum 144 degrees per second
@@ -38,7 +38,7 @@ public class Arm {
   }
 
   // Should be called prior to calling moveToSetpoint() to define the setpoint.
-  public void setSetpoint(double desiredBottomSetpoint, double desiredTopSetpoint) {
+  public final void setSetpoint(double desiredBottomSetpoint, double desiredTopSetpoint) {
     bottomSetpoint = desiredBottomSetpoint;
     topSetpoint = desiredTopSetpoint;
     bottomAtSetpoint = false;
@@ -47,7 +47,7 @@ public class Arm {
   }
   
   // Moves the arm to the setpoint autonomously.
-  public void moveToSetpoint() {
+  public final void moveToSetpoint() {
     if (Math.abs(getPosBottom() - bottomSetpoint) < bottomTol) {
       bottomAtSetpoint = true;
       bottomArm.set(0);
@@ -60,13 +60,13 @@ public class Arm {
     if (Math.abs(getPosTop() - topSetpoint) < topTol) {
       topAtSetpoint = true;
     }
-    topArm.set(ControlMode.MotionMagic, topSetpoint*ticksPerRev);
+    topArm.set(ControlMode.MotionMagic, topSetpoint*armTicksPerRev);
   
     atSetpoint = bottomAtSetpoint && topAtSetpoint;
   }
   
   // Manual control of the arm based on raw controller inputs.
-  public void moveManual(double powerBottom, double powerTop) {
+  public final void moveManual(double powerBottom, double powerTop) {
     if (getPosBottom() > bottomLowLimit || powerBottom > 0) {
       bottomArm.set(MathUtil.applyDeadband(powerBottom, armControllerDeadband));
     } else {
@@ -86,11 +86,11 @@ public class Arm {
     if (topSetpoint < topLowLimit) {
       topSetpoint = topLowLimit;
     }
-    topArm.set(ControlMode.MotionMagic, topSetpoint*ticksPerRev);
+    topArm.set(ControlMode.MotionMagic, topSetpoint*armTicksPerRev);
   }
 
   // Hands back manual control in the case of an arm collision where the setpoint cannot be achieved.
-  public void reset() {
+  public final void reset() {
     bottomAtSetpoint = true;
     topAtSetpoint = true;
     atSetpoint = true;
@@ -98,7 +98,7 @@ public class Arm {
     topArm.set(ControlMode.MotionMagic, getPosTop());
   }
 
-  public double getPosBottom() {
+  public final double getPosBottom() {
     double posBottom = bottomArmEncoder.getPosition();
     if (posBottom > 0.5) {
         posBottom = posBottom - 1;
@@ -106,34 +106,34 @@ public class Arm {
     return posBottom;
   }
 
-  public double getPosTop() {
-    return topArm.getSelectedSensorPosition()/ticksPerRev;
+  public final double getPosTop() {
+    return topArm.getSelectedSensorPosition()/armTicksPerRev;
   }
 
-  public boolean atSetpoint() {
+  public final boolean atSetpoint() {
     return atSetpoint;
   }
 
-  public double getClawX() {
+  public final double getClawX() {
     double bottomAng = getPosBottom()*360+10;
     double topAng = 90-bottomAng+10+getPosTop()*360;
     return -0.72*Math.cos(bottomAng*Math.PI/180) + 0.92*Math.cos(topAng*Math.PI/180);
   }
 
-  public double getClawZ() {
+  public final double getClawZ() {
     double bottomAng = getPosBottom()*360+10;
     double topAng = 90-bottomAng+10+getPosTop()*360;
     return 0.72*Math.sin(bottomAng*Math.PI/180) + 0.92*Math.sin(topAng*Math.PI/180);
   }
 
-  private void initializeArmMotors() {
+  private final void initializeArmMotors() {
     topArm.configFactoryDefault();
 
     TalonFXConfiguration config = new TalonFXConfiguration();
     config.supplyCurrLimit.enable = true;
-    config.supplyCurrLimit.triggerThresholdCurrent = 10; // max current in amps (40 was original)
+    config.supplyCurrLimit.triggerThresholdCurrent = 40; // max current in amps (40 was original)
     config.supplyCurrLimit.triggerThresholdTime = 0.1; // max time exceeding max current in seconds
-    config.supplyCurrLimit.currentLimit = 10; // max current after exceeding threshold 
+    config.supplyCurrLimit.currentLimit = 40; // max current after exceeding threshold 
     topArm.configAllSettings(config);
 
     topArm.setSelectedSensorPosition(0); // sets encoder to 0
