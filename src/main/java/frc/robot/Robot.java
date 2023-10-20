@@ -25,8 +25,9 @@ public class Robot extends TimedRobot {
   }
 
   public void autonomousPeriodic() {
+    drivetrain.updateOdometry();
     if (autoStage == 1) { // Moves arm to Cube Score (Top)
-      drivetrain.driveManual(0, 0);
+      drivetrain.drive(0, 0);
       arm.moveToSetpoint();
       if (arm.atSetpoint()) {
         autoStage++;
@@ -34,26 +35,26 @@ public class Robot extends TimedRobot {
       }
     }
     if (autoStage == 2) { // Opens claw after 0.7s. Delays another 0.3s before advancing to the next stage.
-      drivetrain.driveManual(0, 0);
+      drivetrain.drive(0, 0);
       if (timer.get() > 0.7) { // Delays 0.7s
         claw.open();
       }
       if (timer.get() > 1.0) { // Delays another 0.3s
-        drivetrain.setPathReversal(true);
-        drivetrain.loadPath("Auto Path");
+        drivetrain.resetPathController();
+        drivetrain.resetOdometryToPathStart(0);
         arm.setSetpoint(0.057, -0.255); // Front Floor Pickup
         autoStage++;
       }
     }
     if (autoStage == 3) { // Follows the PathPlanner trajectory to the game piece. Moves arm to Front Floor Pickup.
       arm.moveToSetpoint();
-      drivetrain.followPath();
-      if (arm.atSetpoint() && drivetrain.atEndpoint()) {
+      drivetrain.followPath(0);
+      if (arm.atSetpoint() && drivetrain.atEndpoint(0, 0.03, 0.03, 1)) {
         autoStage++;
       }
     }
     if (autoStage == 4) { // Stops.
-      drivetrain.driveManual(0, 0);
+      drivetrain.drive(0, 0);
     }
   }
 
@@ -62,7 +63,8 @@ public class Robot extends TimedRobot {
   }
 
   public void teleopPeriodic() {
-    drivetrain.driveManual(-stick.getY(), -stick.getZ());
+    drivetrain.updateOdometry();
+    drivetrain.drive(-stick.getY(), -stick.getZ());
 
     if (armCont.getLeftTriggerAxis() > 0.2 && claw.getSensor() && !claw.getClosed()) { // Claw Auto Close
       claw.close();
@@ -112,6 +114,10 @@ public class Robot extends TimedRobot {
     }
   }
 
+  public void robotInit() {
+    drivetrain.loadPath("Auto Path", 2.0, 1.0, false);
+  }
+  
   public void robotPeriodic() {
     updateDash();
   }

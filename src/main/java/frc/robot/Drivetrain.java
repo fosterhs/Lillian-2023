@@ -1,5 +1,7 @@
 package frc.robot;
 
+import java.util.ArrayList;
+
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.can.TalonFXConfiguration;
@@ -12,6 +14,7 @@ import com.pathplanner.lib.PathPlannerTrajectory.PathPlannerState;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.RamseteController;
 import edu.wpi.first.math.filter.SlewRateLimiter;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
@@ -22,36 +25,42 @@ import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class Drivetrain {
-  private final WPI_TalonFX rightFront = new WPI_TalonFX(4); // front right drive motor
-  private final WPI_TalonFX rightBack = new WPI_TalonFX(3); // back right drive motor
-  private final WPI_TalonFX leftFront = new WPI_TalonFX(2); // front left drive motor
-  private final WPI_TalonFX leftBack = new WPI_TalonFX(1); // back left drive motor
+  // Drive motors
+  private final WPI_TalonFX rightFront = new WPI_TalonFX(4);
+  private final WPI_TalonFX rightBack = new WPI_TalonFX(3);
+  private final WPI_TalonFX leftFront = new WPI_TalonFX(2);
+  private final WPI_TalonFX leftBack = new WPI_TalonFX(1);
+
+  // Motor controller groups for teleop
   private final MotorControllerGroup leftMotors = new MotorControllerGroup(leftFront, leftBack);
   private final MotorControllerGroup rightMotors = new MotorControllerGroup(rightFront, rightBack);
   private final DifferentialDrive tank = new DifferentialDrive(leftMotors, rightMotors);
+  
+  // Gyroscope for yaw and pitch
   private final AHRS gyro = new AHRS(); // NavX2 gyro
+  
+  // Drivetrain mechanical constants
   private static final double trackWidth = 0.55;
   private static final double falconTicksPerRev = 2048.0;
   private static final double wheelCirc = 6*0.0254*Math.PI;
   private static final double gearRatio = 10.71;
-  private static final double ticksPerMeter = falconTicksPerRev*gearRatio/wheelCirc;
+  private static final double correctionFactor = 1.0;
+  private static final double ticksPerMeter = falconTicksPerRev*gearRatio/(wheelCirc*correctionFactor);
+  
+  // Teleop controller mapping
   private static final double maxTurnPower = 0.55;
   private static final double xAccLimit = 3.0;
   private static final double AngAccLimit = 3.0/maxTurnPower;
   private static final double driveControllerDeadband = 0.05;
   private final SlewRateLimiter xAccLimiter = new SlewRateLimiter(xAccLimit);
   private final SlewRateLimiter angAccLimiter = new SlewRateLimiter(AngAccLimit);
+ 
+  // Path following
   private DifferentialDriveOdometry odometry = new DifferentialDriveOdometry(Rotation2d.fromDegrees(0), 0, 0);
-  private PathPlannerTrajectory path;
+  private ArrayList<PathPlannerTrajectory> paths = new ArrayList<PathPlannerTrajectory>();
   private RamseteController ramsete;
   private final DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(trackWidth);
   private final Timer timer = new Timer();
-  private double pathXTol = 0.03;
-  private double pathYTol = 0.03;
-  private double pathAngTol = 3.0;
-  private double maxPathVel = 0.8;
-  private double maxPathAcc = 0.4;
-  private boolean pathReversal = false;
 
   public Drivetrain() {
     initializeDriveMotor(rightFront);
@@ -66,11 +75,10 @@ public class Drivetrain {
   }
 
   // Manual control of the drivetrain based on raw controller inputs. One of the driving methods should be called each period.
-  public final void driveManual(double drivePower, double turnPower) {
+  public final void drive(double drivePower, double turnPower) {
     double commandedDrivePower = xAccLimiter.calculate(MathUtil.applyDeadband(drivePower, driveControllerDeadband));
     double commandedTurnPower = angAccLimiter.calculate(MathUtil.applyDeadband(turnPower, driveControllerDeadband)*maxTurnPower);
     tank.arcadeDrive(commandedDrivePower, commandedTurnPower);
-    updateOdometry();
   }
   
   // Autonomous control of the drivetrain based on calculated wheel speeds. One of the driving methods should be called each period.
@@ -80,10 +88,9 @@ public class Drivetrain {
     rightBack.set(ControlMode.Follower, 4);
     leftBack.set(ControlMode.Follower, 2);
     tank.feed();
-    updateOdometry();
   }
 
-  private final void updateOdometry() {
+  public final void updateOdometry() {
     odometry.update(Rotation2d.fromDegrees(getYaw()), getLeftPos(), getRightPos());
   }
 
@@ -111,75 +118,67 @@ public class Drivetrain {
     return gyro.getPitch();
   }
 
-  // Loads the path. Should be called immediately before the user would like the robot to begin tracking the path. Assumes the robot is starting at the field position indicated at the start of the path.
-  public final void loadPath(String pathName) {
+  // Loads the path. All paths should be loaded during robotInit() since this call is computationally expensive. Each path is stored and refered to by the provided index.
+  // pathName: The name of the path in Path Planner
+  // maxPathVel: Maximum robot velocity while following this path. Units: meters per second
+  // maxPathAcc: Maximum robot acceleration while following this path. Units: meters per second^2
+  // pathReversal: Whether the path should be followed in forwards or reverse. 
+  public final void loadPath(String pathName, double maxPathVel, double maxPathAcc, boolean pathReversal) {
+    paths.add(PathPlanner.loadPath(pathName, new PathConstraints(maxPathVel, maxPathAcc), pathReversal));
+  }
+
+  // Should be called once exactly 1 period prior to the start of calls to followPath() each time a new path is followed. 
+  public final void resetPathController() {
     timer.restart();
-    path = PathPlanner.loadPath(pathName, new PathConstraints(maxPathVel, maxPathAcc), pathReversal);
-    PathPlannerState startingState = path.getInitialState();
-    odometry = new DifferentialDriveOdometry(Rotation2d.fromDegrees(getYaw()), getLeftPos(), getRightPos(), startingState.poseMeters);
     ramsete = new RamseteController(2, 0.7);
   }
 
+  // Resets the robot's odometry to the start point of the path loaded into loadPath()
+  public final void resetOdometryToPathStart(int pathIndex) {
+    odometry.resetPosition(Rotation2d.fromDegrees(getYaw()), getLeftPos(), getRightPos(), paths.get(pathIndex).getInitialState().poseMeters);
+
+  }
+
+  // Resets the robot's odometry pose to the desired value. Units: meters and degrees. 
+  public final void resetOdometry(double xPos, double yPos, double angPos) {
+    odometry.resetPosition(Rotation2d.fromDegrees(getYaw()), getLeftPos(), getRightPos(), new Pose2d(xPos, yPos, Rotation2d.fromDegrees(angPos)));
+  }
+
   // Tracks the path. Should be called each period until the endpoint is reached.
-  public final void followPath() {
-    PathPlannerState currentGoal = (PathPlannerState) path.sample(timer.get());
+  public final void followPath(int pathIndex) {
+    PathPlannerState currentGoal = (PathPlannerState) paths.get(pathIndex).sample(timer.get());
     setWheelSpeeds(kinematics.toWheelSpeeds(ramsete.calculate(odometry.getPoseMeters(), currentGoal)));
     SmartDashboard.putNumber("goalX", currentGoal.poseMeters.getX());
     SmartDashboard.putNumber("goalY", currentGoal.poseMeters.getY());
     SmartDashboard.putNumber("goalAng", currentGoal.poseMeters.getRotation().getDegrees());
   }
 
-  // Tells whether the robot has reached the endpoint, within the defined tolerance.
-  public final boolean atEndpoint() {
-    PathPlannerState endState = path.getEndState();
+  // Tells whether the robot has reached the endpoint of the path, within the specified tolerance.
+  // pathIndex: Which path to check, pathXTol and pathYTol: the allowable difference in position in meters, pathAngTol: the allowable difference in angle in degrees
+  public final boolean atEndpoint(int pathIndex, double pathXTol, double pathYTol, double pathAngTol) {
+    PathPlannerState endState = paths.get(pathIndex).getEndState();
     return Math.abs(getYaw() - endState.poseMeters.getRotation().getDegrees()) < pathAngTol 
     && Math.abs(getRobotX() - endState.poseMeters.getX()) < pathXTol 
     && Math.abs(getRobotY() - endState.poseMeters.getY()) < pathYTol;
   }
-  
-  // Path parameters should be adjusted prior to calling loadPath()
-  public final void setPathXTol(double desiredXTol) {
-    pathXTol = desiredXTol;
-  }
-
-  public final void setPathYTol(double desiredYTol) {
-    pathYTol = desiredYTol;
-  }
-
-  public final void setPathAngTol(double desiredAngTol) {
-    pathAngTol = desiredAngTol;
-  }
-
-  public final void setMaxPathVel(double desiredMaxVel) {
-    maxPathVel = desiredMaxVel;
-  }
-
-  public final void setPathReversal(boolean desiredReversal) {
-    pathReversal = desiredReversal;
-  }
-
-  public final void setMaxPathAcc(double desiredMaxAcc) {
-    maxPathAcc = desiredMaxAcc;
-  }
 
   private final void initializeDriveMotor(WPI_TalonFX motor) {
-    motor.configFactoryDefault();
-
     TalonFXConfiguration config = new TalonFXConfiguration();
     config.supplyCurrLimit.enable = true;
     config.supplyCurrLimit.triggerThresholdCurrent = 40; // max current in amps (40 was original)
-    config.supplyCurrLimit.triggerThresholdTime = 0.1; // max time exceeding max current in seconds
+    config.supplyCurrLimit.triggerThresholdTime = 0.5; // max time exceeding max current in seconds
     config.supplyCurrLimit.currentLimit = 40; // max current after exceeding threshold 
-    motor.configAllSettings(config);
 
-    motor.setSelectedSensorPosition(0); // sets encoder to 0
-    motor.setNeutralMode(NeutralMode.Brake);
-
+    // Sets the PID controller parameters
     double kI_drive = 0.0003;
-    motor.config_kP(0, 0.04);
-    motor.config_kI(0, kI_drive);
-    motor.config_kD(0, 1);
-    motor.config_kF(0, 0.0447);
-    motor.configMaxIntegralAccumulator(0, 0.8*1023/kI_drive);
+    config.slot0.kP = 0.04;
+    config.slot0.kI = kI_drive;
+    config.slot0.kD = 1.0;
+    config.slot0.kF = 0.0447;
+    config.slot0.maxIntegralAccumulator = 0.8*1023.0/kI_drive;
+
+    while (motor.configAllSettings(config, 30).value != 0) {}
+    while (motor.setSelectedSensorPosition(0, 0, 30).value != 0) {}
+    motor.setNeutralMode(NeutralMode.Brake);
   }
 }
