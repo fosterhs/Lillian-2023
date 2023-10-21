@@ -1,6 +1,5 @@
 package frc.robot;
 
-import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.Timer;
@@ -14,8 +13,8 @@ public class Robot extends TimedRobot {
   Claw claw = new Claw();
   PowerDistribution pdp = new PowerDistribution(0, ModuleType.kCTRE);
   Timer timer = new Timer();
-  XboxController armCont = new XboxController(0);
-  Joystick stick = new Joystick(1);
+  XboxController armController = new XboxController(0);
+  XboxController driveController = new XboxController(1);
   int autoStage = 1;
 
   public void autonomousInit() {
@@ -64,58 +63,58 @@ public class Robot extends TimedRobot {
 
   public void teleopPeriodic() {
     drivetrain.updateOdometry();
-    drivetrain.drive(-stick.getY(), -stick.getZ());
+    drivetrain.drive(-driveController.getLeftY(),-driveController.getRightX());
 
-    if (armCont.getLeftTriggerAxis() > 0.2 && claw.getSensor() && !claw.getClosed()) { // Claw Auto Close
+    if (armController.getLeftTriggerAxis() > 0.2 && claw.getSensor() && !claw.getClosed()) { // Claw Auto Close
       claw.close();
       timer.reset();
     }
-    if (armCont.getLeftTriggerAxis() > 0.2 && !claw.getSensor() && timer.get() > 1.0) { // Claw Auto Open
+    if (armController.getLeftTriggerAxis() > 0.2 && !claw.getSensor() && timer.get() > 1.0) { // Claw Auto Open
       claw.open();
     }
-    if (armCont.getLeftBumperPressed()) {
+    if (armController.getLeftBumperPressed()) {
       claw.close();
     }
-    if (armCont.getRightBumperPressed()) {
+    if (armController.getRightBumperPressed()) {
       claw.open();
     }
 
-    if (armCont.getPOV() == 0) { // Hands over manual control in the case of an arm collision that prevents the arm from reaching the setpoint.
+    if (armController.getPOV() == 0) { // Hands over manual control in the case of an arm collision that prevents the arm from reaching the setpoint.
       arm.reset();
     }
-    if (armCont.getAButtonPressed()) { // Drive/Carry
+    if (armController.getAButtonPressed()) { // Drive/Carry
       arm.setSetpoint(0, -0.068);
     }
-    if (armCont.getBButtonPressed()) { // Front Floor Pickup
+    if (armController.getBButtonPressed()) { // Front Floor Pickup
       arm.setSetpoint(0.057, -0.255);
     }
-    if (armCont.getXButtonPressed()) { // Substation Pickup
+    if (armController.getXButtonPressed()) { // Substation Pickup
       arm.setSetpoint(0.095, -0.073);
     }
-    if (armCont.getYButtonPressed()) { // Cube Score (Middle)
+    if (armController.getYButtonPressed()) { // Cube Score (Middle)
       arm.setSetpoint(0.136, -0.111);
     }
-    if (armCont.getPOV() == 180) { // Cube Score (Top)
+    if (armController.getPOV() == 180) { // Cube Score (Top)
       arm.setSetpoint(0.245, 0.043);
     }
-    if (armCont.getRightTriggerAxis() > 0.25) { // Cone Score (Top)
+    if (armController.getRightTriggerAxis() > 0.25) { // Cone Score (Top)
       arm.setSetpoint(0.256, 0.110);
     }
-    if (armCont.getStartButtonPressed()) { // Starting Position
+    if (armController.getStartButtonPressed()) { // Starting Position
       arm.setSetpoint(0, 0);
     }
-    if (armCont.getBackButtonPressed()) { // Cone Score (Middle)
+    if (armController.getBackButtonPressed()) { // Cone Score (Middle)
       arm.setSetpoint(0.158, -0.040);
     }
     if (!arm.atSetpoint()) {
       arm.moveToSetpoint();
     } else {
-      arm.moveManual(-armCont.getLeftY(), -armCont.getRightY());
+      arm.moveManual(-armController.getLeftY(), -armController.getRightY());
     }
   }
 
   public void robotInit() {
-    drivetrain.loadPath("Auto Path", 2.0, 1.0, false);
+    drivetrain.loadPath("Auto Path", 2.0, 1.0, true);
   }
   
   public void robotPeriodic() {

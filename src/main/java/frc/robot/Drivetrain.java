@@ -1,7 +1,6 @@
 package frc.robot;
 
 import java.util.ArrayList;
-
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.can.TalonFXConfiguration;
@@ -11,9 +10,7 @@ import com.pathplanner.lib.PathConstraints;
 import com.pathplanner.lib.PathPlanner;
 import com.pathplanner.lib.PathPlannerTrajectory;
 import com.pathplanner.lib.PathPlannerTrajectory.PathPlannerState;
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.RamseteController;
-import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
@@ -48,12 +45,9 @@ public class Drivetrain {
   private static final double ticksPerMeter = falconTicksPerRev*gearRatio/(wheelCirc*correctionFactor);
   
   // Teleop controller mapping
-  private static final double maxTurnPower = 0.55;
-  private static final double xAccLimit = 3.0;
-  private static final double AngAccLimit = 3.0/maxTurnPower;
-  private static final double driveControllerDeadband = 0.05;
-  private final SlewRateLimiter xAccLimiter = new SlewRateLimiter(xAccLimit);
-  private final SlewRateLimiter angAccLimiter = new SlewRateLimiter(AngAccLimit);
+  private static final double maxTurnPower = 0.5;
+  private static final double driveControllerDeadband = 0.04;
+  private static final double minJoystickDriveResponse = 0.24;
  
   // Path following
   private DifferentialDriveOdometry odometry = new DifferentialDriveOdometry(Rotation2d.fromDegrees(0), 0, 0);
@@ -76,9 +70,23 @@ public class Drivetrain {
 
   // Manual control of the drivetrain based on raw controller inputs. One of the driving methods should be called each period.
   public final void drive(double drivePower, double turnPower) {
-    double commandedDrivePower = xAccLimiter.calculate(MathUtil.applyDeadband(drivePower, driveControllerDeadband));
-    double commandedTurnPower = angAccLimiter.calculate(MathUtil.applyDeadband(turnPower, driveControllerDeadband)*maxTurnPower);
-    tank.arcadeDrive(commandedDrivePower, commandedTurnPower);
+    double driveOutput = 0.0;
+    if (Math.abs(drivePower) > driveControllerDeadband) {
+      if (drivePower > 0) {
+        driveOutput = minJoystickDriveResponse+(1.0-minJoystickDriveResponse)*Math.pow(drivePower, 2);
+      } else {
+        driveOutput = -minJoystickDriveResponse-(1.0-minJoystickDriveResponse)*Math.pow(drivePower, 2);
+      }
+   }
+   double turnOutput = 0.0;
+   if (Math.abs(turnPower) > driveControllerDeadband) {
+     if (turnPower > 0) {
+       turnOutput = minJoystickDriveResponse+(maxTurnPower-minJoystickDriveResponse)*Math.pow(turnPower, 2);
+     } else {
+      turnOutput = -minJoystickDriveResponse-(maxTurnPower-minJoystickDriveResponse)*Math.pow(turnPower, 2);
+     }
+   }
+    tank.arcadeDrive(driveOutput, turnOutput);
   }
   
   // Autonomous control of the drivetrain based on calculated wheel speeds. One of the driving methods should be called each period.
@@ -165,9 +173,9 @@ public class Drivetrain {
   private final void initializeDriveMotor(WPI_TalonFX motor) {
     TalonFXConfiguration config = new TalonFXConfiguration();
     config.supplyCurrLimit.enable = true;
-    config.supplyCurrLimit.triggerThresholdCurrent = 40; // max current in amps (40 was original)
-    config.supplyCurrLimit.triggerThresholdTime = 0.5; // max time exceeding max current in seconds
-    config.supplyCurrLimit.currentLimit = 40; // max current after exceeding threshold 
+    config.supplyCurrLimit.triggerThresholdCurrent = 40.0; // max current in amps (40 was original)
+    config.supplyCurrLimit.triggerThresholdTime = 1.0; // max time exceeding max current in seconds
+    config.supplyCurrLimit.currentLimit = 40.0; // max current after exceeding threshold 
 
     // Sets the PID controller parameters
     double kI_drive = 0.0003;
