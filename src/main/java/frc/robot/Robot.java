@@ -97,6 +97,12 @@ public class Robot extends TimedRobot {
     if (armController.getPOV() == 180) { // Cube Score (Top)
       arm.setSetpoint(0.245, 0.043);
     }
+    if (armController.getPOV() == 90) { // Low Cone Pickup (Training)
+      arm.setSetpoint(0.041, -0.231);
+    }
+    if (armController.getPOV() == 270) { // High Cone Score (Training)
+      arm.setSetpoint(0.186, -0.030);
+    }
     if (armController.getRightTriggerAxis() > 0.25) { // Cone Score (Top)
       arm.setSetpoint(0.256, 0.110);
     }
