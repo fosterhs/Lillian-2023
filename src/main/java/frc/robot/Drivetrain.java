@@ -41,7 +41,7 @@ public class Drivetrain {
   private static final double falconTicksPerRev = 2048.0;
   private static final double wheelCirc = 6*0.0254*Math.PI;
   private static final double gearRatio = 10.71;
-  private static final double correctionFactor = 1.0;
+  private static final double correctionFactor = 1.22;
   private static final double ticksPerMeter = falconTicksPerRev*gearRatio/(wheelCirc*correctionFactor);
   
   // Teleop controller mapping
@@ -173,9 +173,9 @@ public class Drivetrain {
   private final void initializeDriveMotor(WPI_TalonFX motor) {
     TalonFXConfiguration config = new TalonFXConfiguration();
     config.supplyCurrLimit.enable = true;
-    config.supplyCurrLimit.triggerThresholdCurrent = 25.0; // max current in amps (40 was original)
+    config.supplyCurrLimit.triggerThresholdCurrent = 15.0; // max current in amps (40 was original)
     config.supplyCurrLimit.triggerThresholdTime = 0.0; // max time exceeding max current in seconds
-    config.supplyCurrLimit.currentLimit = 25.0; // max current after exceeding threshold 
+    config.supplyCurrLimit.currentLimit = 15.0; // max current after exceeding threshold 
 
     // Sets the PID controller parameters
     double kI_drive = 0.0003;

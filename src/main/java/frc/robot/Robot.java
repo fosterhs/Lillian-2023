@@ -13,8 +13,8 @@ public class Robot extends TimedRobot {
   Claw claw = new Claw();
   PowerDistribution pdp = new PowerDistribution(0, ModuleType.kCTRE);
   Timer timer = new Timer();
-  XboxController armController = new XboxController(0);
-  XboxController driveController = new XboxController(1);
+  XboxController driveController = new XboxController(0);
+  XboxController armController = new XboxController(1);
   int autoStage = 1;
 
   public void autonomousInit() {
