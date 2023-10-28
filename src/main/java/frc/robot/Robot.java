@@ -79,8 +79,11 @@ public class Robot extends TimedRobot {
       claw.open();
     }
 
-    if (armController.getPOV() == 0) { // Hands over manual control in the case of an arm collision that prevents the arm from reaching the setpoint.
+    if (armController.getBackButtonPressed()) { // Hands over manual control in the case of an arm collision that prevents the arm from reaching the setpoint.
       arm.reset();
+    }
+    if (armController.getStartButtonPressed()) { // Starting Position
+      arm.setSetpoint(0, 0);
     }
     if (armController.getAButtonPressed()) { // Drive/Carry
       arm.setSetpoint(0, -0.068);
@@ -91,25 +94,16 @@ public class Robot extends TimedRobot {
     if (armController.getXButtonPressed()) { // Substation Pickup
       arm.setSetpoint(0.095, -0.073);
     }
-    if (armController.getYButtonPressed()) { // Cube Score (Middle)
+    if (armController.getPOV() == 180) { // Cube Score (Middle)
       arm.setSetpoint(0.136, -0.111);
     }
-    if (armController.getPOV() == 180) { // Cube Score (Top)
+    if (armController.getPOV() == 90) { // Cube Score (Top)
       arm.setSetpoint(0.245, 0.043);
     }
-    if (armController.getPOV() == 90) { // Low Cone Pickup (Training)
-      arm.setSetpoint(0.041, -0.231);
-    }
-    if (armController.getPOV() == 270) { // High Cone Score (Training)
-      arm.setSetpoint(0.186, -0.030);
-    }
-    if (armController.getRightTriggerAxis() > 0.25) { // Cone Score (Top)
+    if (armController.getPOV() == 0) { // Cone Score (Top)
       arm.setSetpoint(0.256, 0.110);
     }
-    if (armController.getStartButtonPressed()) { // Starting Position
-      arm.setSetpoint(0, 0);
-    }
-    if (armController.getBackButtonPressed()) { // Cone Score (Middle)
+    if (armController.getPOV() == 270) { // Cone Score (Middle)
       arm.setSetpoint(0.158, -0.040);
     }
     if (!arm.atSetpoint()) {
