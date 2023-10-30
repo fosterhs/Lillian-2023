@@ -20,7 +20,7 @@ public class Robot extends TimedRobot {
   public void autonomousInit() {
     claw.enableCompressor();
     claw.close();
-    arm.setSetpoint(0.245, 0.043); // Cube Score (Top)
+    arm.setSetpoint(0.136, -0.111); // Cube Score (High)
   }
 
   public void autonomousPeriodic() {
@@ -42,11 +42,14 @@ public class Robot extends TimedRobot {
         drivetrain.resetPathController();
         drivetrain.resetOdometryToPathStart(0);
         arm.setSetpoint(0.057, -0.255); // Front Floor Pickup
+        timer.restart();
         autoStage++;
       }
     }
     if (autoStage == 3) { // Follows the PathPlanner trajectory to the game piece. Moves arm to Front Floor Pickup.
-      arm.moveToSetpoint();
+      if (timer.get() > 4.0) {
+        arm.moveToSetpoint();
+      }
       drivetrain.followPath(0);
       if (arm.atSetpoint() && drivetrain.atEndpoint(0, 0.03, 0.03, 1)) {
         autoStage++;
@@ -92,7 +95,7 @@ public class Robot extends TimedRobot {
       arm.setSetpoint(0.057, -0.255);
     }
     if (armController.getXButtonPressed()) { // Substation Pickup
-      arm.setSetpoint(0.095, -0.073);
+      arm.setSetpoint(0.141, -0.067);
     }
     if (armController.getPOV() == 180) { // Cube Score (Middle)
       arm.setSetpoint(0.136, -0.111);
